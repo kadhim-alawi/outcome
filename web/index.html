@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OUTCOME</title>
+<style>
+  :root {
+    --bg: #f7f6f3; --panel: #ffffff; --ink: #1b1a17; --muted: #6b6862;
+    --line: #e3e0d9; --accent: #1f6f5c; --warn: #a8641b; --bad: #a3372b;
+    --good: #1f6f5c; --shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.05);
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14150f; --panel: #1c1d17; --ink: #eceadf; --muted: #9a978c;
+      --line: #2e2f27; --accent: #6fc0a5; --warn: #d99a4e; --bad: #e0796a;
+      --good: #6fc0a5; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 20px 96px; }
+
+  header { margin-bottom: 28px; }
+  h1 { font-size: 26px; letter-spacing: .14em; margin: 0 0 4px; font-weight: 650; }
+  .tag { color: var(--muted); font-size: 15px; margin: 0; }
+  .mode {
+    display: inline-block; margin-top: 12px; font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .mode.live { color: var(--bad); border-color: var(--bad); font-weight: 600; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px;
+  }
+  label { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+          color: var(--muted); margin-bottom: 7px; }
+  textarea, select {
+    width: 100%; font: inherit; color: inherit; background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; resize: vertical;
+  }
+  textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 12px; align-items: flex-end; margin-top: 14px; flex-wrap: wrap; }
+  .row > div { flex: 1 1 240px; }
+  button {
+    font: inherit; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  button:disabled { opacity: .45; cursor: default; }
+
+  .constraints { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-size: 12.5px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  /* timeline */
+  #timeline { position: relative; padding-left: 26px; }
+  #timeline::before {
+    content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px;
+    width: 1px; background: var(--line);
+  }
+  .step { position: relative; margin-bottom: 22px; animation: rise .32s ease both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { .step { animation: none; } }
+  .dot {
+    position: absolute; left: -26px; top: 4px; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--panel); border: 2px solid var(--line);
+  }
+  .step.call .dot { border-color: var(--accent); }
+  .step.good .dot { border-color: var(--good); background: var(--good); }
+  .step.bad .dot { border-color: var(--bad); }
+  .step.warn .dot { border-color: var(--warn); background: var(--warn); }
+
+  .step h3 { margin: 0 0 3px; font-size: 15px; font-weight: 600; }
+  .step .sub { color: var(--muted); font-size: 13.5px; }
+  .step .phone { font-family: var(--mono); font-size: 12.5px; }
+  ul.facts { margin: 8px 0 0; padding-left: 17px; color: var(--muted); font-size: 14px; }
+  ul.facts li { margin-bottom: 2px; }
+  ul.facts li.blocker { color: var(--bad); }
+
+  .offer { margin-top: 10px; border: 1px solid var(--line); border-radius: 9px; padding: 12px 14px; }
+  .offer .head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .offer .price { font-family: var(--mono); font-weight: 600; }
+  .verdict { font-size: 12px; letter-spacing: .05em; text-transform: uppercase; font-weight: 600; }
+  .verdict.ok { color: var(--good); } .verdict.no { color: var(--bad); }
+  .checks { margin: 9px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
+  .checks li { display: flex; gap: 8px; }
+  .checks .m { width: 1em; font-weight: 700; }
+  .checks .ok .m { color: var(--good); } .checks .no .m { color: var(--bad); }
+  .checks .soft .m { color: var(--warn); } .checks .unk .m { color: var(--muted); }
+
+  .lead { color: var(--warn); font-size: 13.5px; margin-top: 7px; }
+
+  .approval { border-color: var(--warn); border-width: 2px; }
+  .approval h2 { margin: 0 0 6px; font-size: 13px; letter-spacing: .09em;
+                 text-transform: uppercase; color: var(--warn); }
+  .approval p.q { font-size: 17px; margin: 0 0 12px; }
+  .rejected { margin-top: 12px; font-size: 13.5px; color: var(--muted); }
+
+  .result { border-width: 2px; }
+  .result.ok { border-color: var(--good); } .result.no { border-color: var(--bad); }
+  .result h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .09em; text-transform: uppercase; }
+  .result.ok h2 { color: var(--good); } .result.no h2 { color: var(--bad); }
+  .result .headline { font-size: 19px; margin: 0 0 10px; }
+  .ref { font-family: var(--mono); font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13.5px; margin-top: 10px; }
+  .hidden { display: none; }
+  .spinner { display: inline-block; width: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>OUTCOME</h1>
+    <p class="tag">Don't tell it who to call. Tell it what needs to happen.</p>
+    <span class="mode" id="mode">checking…</span>
+  </header>
+
+  <section class="card" id="form">
+    <label for="goal">What needs to happen?</label>
+    <textarea id="goal" rows="3"></textarea>
+    <div class="constraints" id="chips"></div>
+    <div class="row">
+      <div>
+        <label for="scenario">Scenario</label>
+        <select id="scenario"></select>
+      </div>
+      <button id="start">Start</button>
+    </div>
+  </section>
+
+  <div id="timeline"></div>
+  <div id="approval"></div>
+  <div id="result"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const STEP_DELAY = 900;
+let runId = null;
+let scenarios = [];
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const money = (o) =>
+  o.price == null ? "no price quoted" : `${o.currency} ${o.price.toFixed(2)}`;
+
+function markClass(r) {
+  if (r.judgement === "satisfied") return "ok";
+  if (r.judgement === "violated") return r.hard ? "no" : "soft";
+  return "unk";
+}
+function markGlyph(r) {
+  if (r.judgement === "satisfied") return "✓";
+  if (r.judgement === "violated") return r.hard ? "✗" : "~";
+  return "?";
+}
+const checks = (results) => `<ul class="checks">${results.map((r) =>
+  `<li class="${markClass(r)}"><span class="m">${markGlyph(r)}</span><span>${esc(r.detail)}</span></li>`
+).join("")}</ul>`;
+
+function chips(constraints) {
+  $("chips").innerHTML = (constraints || []).map((c) =>
+    `<span class="chip"><b>${esc(c.kind)}</b> · ${esc(c.description)}${c.hard ? "" : " (soft)"}</span>`
+  ).join("");
+}
+
+function step(cls, html) {
+  const el = document.createElement("div");
+  el.className = `step ${cls}`;
+  el.innerHTML = `<span class="dot"></span>${html}`;
+  $("timeline").appendChild(el);
+  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  return el;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function renderEvent(e) {
+  switch (e.kind) {
+    // "planned" is not rendered: the very next event is "calling", carrying the
+    // same purpose, and showing both makes every call appear twice.
+    case "planned":
+      return;
+    case "calling":
+      return step("call", `<h3>☎ ${esc(e.purpose)}</h3>
+        <div class="sub"><span class="phone">${esc(e.phone)}</span>${
+          e.attempt > 1 ? ` · attempt ${e.attempt}` : ""
+        }${e.commits_user ? ' · <b>commits you</b>' : ""}</div>`);
+    case "lead_discovered":
+      return step("warn", `<h3>New lead: ${esc(e.org)}</h3>
+        <div class="sub"><span class="phone">${esc(e.phone)}</span></div>
+        <div class="lead">${esc(e.reason)}</div>`);
+    case "evidence": {
+      const good = ["confirmed"].includes(e.verdict);
+      const bad = ["blocked", "refused", "no_answer"].includes(e.verdict);
+      let html = `<h3>${esc(e.org || "")} — ${esc(e.verdict.replace("_", " "))}</h3>`;
+      const items = (e.facts || []).map((f) => `<li>${esc(f)}</li>`)
+        .concat((e.blockers || []).map((b) => `<li class="blocker">${esc(b)}</li>`));
+      if (items.length) html += `<ul class="facts">${items.join("")}</ul>`;
+      if (e.offer) {
+        html += `<div class="offer"><div class="head">
+            <span>${esc(e.offer.summary)}${e.offer.eta ? ` · ${esc(e.offer.eta)}` : ""}</span>
+            <span class="price">${esc(money(e.offer))}</span></div>
+          <div class="verdict ${e.acceptable ? "ok" : "no"}">${
+            e.acceptable ? "meets your requirements" : "rejected"
+          }</div>${checks(e.constraint_report || [])}</div>`;
+      }
+      return step(good ? "good" : bad ? "bad" : "", html);
+    }
+    case "approved":  return step("good", `<h3>You approved it</h3>`);
+    case "rejected":  return step("bad", `<h3>You declined — back out to look again</h3>
+                                          <div class="sub">${esc(e.reason)}</div>`);
+    case "awaiting_user": return step("warn", `<h3>Waiting on you</h3>
+                                          <div class="sub">${esc(e.purpose)}</div>`);
+    case "error":     return step("bad", `<h3>Error</h3><div class="sub">${esc(e.detail)}</div>`);
+    default: return;
+  }
+}
+
+function renderApproval(e) {
+  const rejected = (e.rejected || []).map((r) =>
+    `<div>Turned down: ${esc(r.offer.summary)} — ${esc(money(r.offer))}</div>`).join("");
+  $("approval").innerHTML = `<div class="card approval">
+      <h2>Approval needed</h2>
+      <p class="q">${esc(e.prompt)}</p>
+      ${e.evaluation ? checks(e.evaluation.results) : ""}
+      ${rejected ? `<div class="rejected">${rejected}</div>` : ""}
+      <div class="row">
+        <button id="yes">Approve</button>
+        <button id="no" class="ghost">Decline</button>
+      </div>
+    </div>`;
+  $("yes").onclick = () => decide(true);
+  $("no").onclick = () => decide(false);
+}
+
+function renderResult(e, ok) {
+  $("approval").innerHTML = "";
+  const parties = (e.parties || []).map((p) =>
+    `<div>${esc(p.name)} · <span class="phone">${esc(p.phone)}</span> · ${p.calls} call${
+      p.calls === 1 ? "" : "s"} · ${esc(p.verdict.replace("_", " "))}${
+      p.discovered ? " · found by the agent" : ""}</div>`).join("");
+  $("result").innerHTML = `<div class="card result ${ok ? "ok" : "no"}">
+      <h2>${ok ? "Resolved" : "Not resolved"}</h2>
+      <p class="headline">${esc(e.headline)}</p>
+      ${e.reference ? `<div>Reference <span class="ref">${esc(e.reference)}</span></div>` : ""}
+      ${e.why ? `<div class="sub">${esc(e.why)}</div>` : ""}
+      ${e.constraint_report && e.constraint_report.length ? checks(e.constraint_report) : ""}
+      <div class="meta">${e.calls_placed} of ${e.call_budget} calls used.</div>
+      <div class="meta">${parties}</div>
+    </div>`;
+  $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+async function play(events) {
+  for (const e of events) {
+    if (e.kind === "started") { chips(); continue; }
+    if (e.kind === "approval_required") { await sleep(STEP_DELAY); renderApproval(e); return; }
+    if (e.kind === "resolved")  { await sleep(STEP_DELAY); renderResult(e, true);  return; }
+    if (e.kind === "abandoned") { await sleep(STEP_DELAY); renderResult(e, false); return; }
+    if (renderEvent(e)) await sleep(STEP_DELAY);
+  }
+}
+
+async function start() {
+  $("start").disabled = true;
+  $("timeline").innerHTML = ""; $("approval").innerHTML = ""; $("result").innerHTML = "";
+  const body = { scenario: $("scenario").value, text: $("goal").value };
+  const res = await fetch("/api/runs", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) { step("bad", `<h3>Could not start</h3><div class="sub">${esc(data.error)}</div>`);
+                 $("start").disabled = false; return; }
+  runId = data.outcome.id;
+  chips(data.outcome.constraints);
+  await play(data.events);
+  $("start").disabled = false;
+}
+
+async function decide(approve) {
+  $("approval").innerHTML = "";
+  const res = await fetch("/api/decide", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ run_id: runId, approve }),
+  });
+  const data = await res.json();
+  if (!res.ok) { step("bad", `<h3>${esc(data.error)}</h3>`); return; }
+  await play(data.events);
+}
+
+async function boot() {
+  const res = await fetch("/api/scenarios");
+  scenarios = (await res.json()).scenarios;
+  $("scenario").innerHTML = scenarios.map((s) =>
+    `<option value="${esc(s.name)}">${esc(s.title)}</option>`).join("");
+  const first = scenarios[0];
+  if (first) { $("goal").value = first.goal; }
+  $("scenario").onchange = () => {
+    const s = scenarios.find((x) => x.name === $("scenario").value);
+    if (s) $("goal").value = s.goal;
+  };
+  const { live } = await (await fetch("/api/mode")).json();
+  $("mode").textContent = live ? "live · real calls" : "mock · no calls placed";
+  $("mode").className = live ? "mode live" : "mode";
+  $("start").onclick = start;
+}
+boot();
+</script>
+</body>
+</html>

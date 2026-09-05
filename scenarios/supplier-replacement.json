@@ -1,0 +1,131 @@
+{
+  "name": "supplier-replacement",
+  "title": "Damaged pallet, replacement needed before Friday",
+  "description": "A wholesale bakery took delivery of a pallet of insulated shipping boxes that arrived crushed. They need a replacement before Friday and cannot spend more than $500. The original supplier cannot help; the chain of calls has to find someone who can. Every phone number here is in the +1-555 range reserved for fiction, and no call is placed: this scenario drives the mock transport.",
+  "outcome": {
+    "goal": "Get a replacement pallet of 500 insulated shipping boxes for the crushed delivery on order BK-7741.",
+    "budget": {"max_calls": 6, "max_calls_per_org": 2, "max_actions": 20},
+    "constraints": [
+      {"kind": "budget", "description": "Total replacement cost at or under USD 500", "value": 500, "hard": true},
+      {"kind": "deadline", "description": "Delivered on or before Friday 11 September", "value": "2026-09-11", "hard": true},
+      {"kind": "required_fact", "description": "A reference number for the replacement", "value": "reference", "hard": false}
+    ],
+    "organizations": [
+      {"name": "Halden Packaging", "phone": "+15550100001", "role": "Original supplier on order BK-7741"}
+    ]
+  },
+  "responses": [
+    {
+      "phone": "+15550100001",
+      "attempt": 1,
+      "status": "completed",
+      "structured": {
+        "reached": false,
+        "verdict": "no_answer",
+        "facts": [],
+        "blockers": ["Rang out to voicemail; no option to hold."],
+        "referrals": [],
+        "offer": null
+      }
+    },
+    {
+      "phone": "+15550100001",
+      "attempt": 2,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "blocked",
+        "facts": [
+          "Order BK-7741 is confirmed damaged in their system.",
+          "The insulated box line is out of stock until the end of the month.",
+          "They will credit the original order but cannot supply a replacement."
+        ],
+        "blockers": ["No stock of insulated shipping boxes until 30 September."],
+        "referrals": [
+          {
+            "org_name": "Northgate Distribution",
+            "phone": "+15550100002",
+            "role": "Regional distributor carrying the same line",
+            "reason": "Halden say Northgate hold stock of the identical box."
+          }
+        ],
+        "offer": null
+      }
+    },
+    {
+      "phone": "+15550100002",
+      "attempt": 1,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "offer",
+        "facts": [
+          "They hold 500 of the identical insulated box in Bay 4.",
+          "Next-day courier is the only delivery option at this notice.",
+          "The courier surcharge is what pushes the total over the line."
+        ],
+        "blockers": [],
+        "referrals": [
+          {
+            "org_name": "Brightwater Depot",
+            "phone": "+15550100003",
+            "role": "Northgate's own depot, 20km from the bakery",
+            "reason": "Same stock without the courier surcharge if collected or locally delivered."
+          }
+        ],
+        "offer": {
+          "summary": "500 insulated shipping boxes, next-day courier",
+          "price": 612.0,
+          "currency": "USD",
+          "eta": "2026-09-10",
+          "reference": null
+        }
+      }
+    },
+    {
+      "phone": "+15550100003",
+      "attempt": 1,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "offer",
+        "facts": [
+          "The depot has the same 500 boxes on the floor.",
+          "Their own van runs the bakery's district on Thursday mornings.",
+          "No courier surcharge on a local run."
+        ],
+        "blockers": [],
+        "referrals": [],
+        "offer": {
+          "summary": "500 insulated shipping boxes, local van delivery",
+          "price": 438.0,
+          "currency": "USD",
+          "eta": "2026-09-10",
+          "reference": null
+        }
+      }
+    },
+    {
+      "phone": "+15550100003",
+      "attempt": 2,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "confirmed",
+        "facts": [
+          "Replacement booked onto Thursday's van run.",
+          "Invoice will reference the damaged order BK-7741."
+        ],
+        "blockers": [],
+        "referrals": [],
+        "offer": {
+          "summary": "500 insulated shipping boxes, local van delivery",
+          "price": 438.0,
+          "currency": "USD",
+          "eta": "2026-09-10",
+          "reference": "BWD-48291"
+        }
+      }
+    }
+  ]
+}
