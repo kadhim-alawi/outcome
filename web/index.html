@@ -24,7 +24,7 @@
     font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 40px 20px 96px; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 20px 96px; }
 
   header { margin-bottom: 28px; }
   h1 { font-size: 26px; letter-spacing: .14em; margin: 0 0 4px; font-weight: 650; }
@@ -40,31 +40,56 @@
     background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
     padding: 20px; box-shadow: var(--shadow); margin-bottom: 20px;
   }
-  label { display: block; font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
-          color: var(--muted); margin-bottom: 7px; }
-  textarea, select {
+  fieldset { border: 0; padding: 0; margin: 0 0 18px; }
+  legend, label {
+    font-size: 12px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--muted); padding: 0; margin-bottom: 7px; display: block;
+  }
+  textarea, select, input {
     width: 100%; font: inherit; color: inherit; background: transparent;
-    border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; resize: vertical;
+    min-width: 0;
   }
-  textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .row { display: flex; gap: 12px; align-items: flex-end; margin-top: 14px; flex-wrap: wrap; }
-  .row > div { flex: 1 1 240px; }
+  input[type="number"] { font-family: var(--mono); }
+  textarea:focus, select:focus, input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 7px 0 0; }
+
   button {
-    font: inherit; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer;
-    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    font: inherit; font-weight: 600; padding: 9px 18px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; white-space: nowrap;
   }
-  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; }
+  button.link {
+    background: transparent; border: 0; color: var(--accent); padding: 4px 0;
+    font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px;
+  }
+  button.del {
+    background: transparent; border: 1px solid var(--line); color: var(--muted);
+    padding: 0; width: 34px; height: 36px; font-weight: 400; line-height: 1;
+  }
+  button.del:hover { color: var(--bad); border-color: var(--bad); }
   button:disabled { opacity: .45; cursor: default; }
 
-  .constraints { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip {
-    font-size: 12.5px; padding: 4px 10px; border-radius: 999px;
-    border: 1px solid var(--line); color: var(--muted);
+  .grid { display: grid; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .grid.constraint { grid-template-columns: 8.5rem 1fr 7.5rem 6.5rem 34px; }
+  .grid.org { grid-template-columns: 1fr 11rem 1fr 34px; }
+  .grid.budget { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  @media (max-width: 640px) {
+    .grid.constraint, .grid.org { grid-template-columns: 1fr 1fr; }
+    .grid.constraint > :nth-child(2), .grid.org > :nth-child(1) { grid-column: 1 / -1; }
   }
-  .chip b { color: var(--ink); font-weight: 600; }
+  .foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-top: 18px; }
+  .foot > .grow { flex: 1 1 200px; }
+
+  .error {
+    border: 1px solid var(--bad); color: var(--bad); border-radius: 8px;
+    padding: 10px 12px; margin-top: 14px; font-size: 14px;
+  }
+  .error:empty { display: none; }
 
   /* timeline */
   #timeline { position: relative; padding-left: 26px; }
+  #timeline:empty { display: none; }
   #timeline::before {
     content: ""; position: absolute; left: 6px; top: 6px; bottom: 6px;
     width: 1px; background: var(--line);
@@ -114,8 +139,6 @@
   .result .headline { font-size: 19px; margin: 0 0 10px; }
   .ref { font-family: var(--mono); font-weight: 600; }
   .meta { color: var(--muted); font-size: 13.5px; margin-top: 10px; }
-  .hidden { display: none; }
-  .spinner { display: inline-block; width: 11px; }
 </style>
 </head>
 <body>
@@ -123,20 +146,56 @@
   <header>
     <h1>OUTCOME</h1>
     <p class="tag">Don't tell it who to call. Tell it what needs to happen.</p>
-    <span class="mode" id="mode">checking…</span>
+    <span class="mode" id="mode">checking&hellip;</span>
   </header>
 
   <section class="card" id="form">
-    <label for="goal">What needs to happen?</label>
-    <textarea id="goal" rows="3"></textarea>
-    <div class="constraints" id="chips"></div>
-    <div class="row">
-      <div>
+    <fieldset>
+      <label for="goal">What needs to happen?</label>
+      <textarea id="goal" rows="3"></textarea>
+      <button class="link" id="parse" type="button">Read the requirements out of this</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Requirements &mdash; what an acceptable answer has to satisfy</legend>
+      <div id="constraints"></div>
+      <button class="link" id="add-constraint" type="button">+ add a requirement</button>
+      <p class="hint">
+        <b>Must</b> disqualifies an answer that breaks it. <b>Prefer</b> only ranks it lower.
+        Amounts are plain numbers; dates are YYYY-MM-DD.
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Who to call first</legend>
+      <div id="orgs"></div>
+      <button class="link" id="add-org" type="button">+ add an organisation</button>
+      <p class="hint" id="phonebook-hint"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Call budget</legend>
+      <div class="grid budget">
+        <div>
+          <label for="max-calls">Calls in total</label>
+          <input id="max-calls" type="number" min="1" max="25" value="6">
+        </div>
+        <div>
+          <label for="max-per-org">Calls per organisation</label>
+          <input id="max-per-org" type="number" min="1" max="5" value="2">
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="foot">
+      <div class="grow">
         <label for="scenario">Scenario</label>
         <select id="scenario"></select>
       </div>
-      <button id="start">Start</button>
+      <button id="start" type="button">Start</button>
+      <button id="reset" class="ghost" type="button">Reset</button>
     </div>
+    <div class="error" id="error"></div>
   </section>
 
   <div id="timeline"></div>
@@ -147,45 +206,135 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const STEP_DELAY = 900;
+const KINDS = ["budget", "minimum", "deadline", "required_fact", "preference", "forbidden"];
 let runId = null;
 let scenarios = [];
+let live = false;
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const money = (o) => o.price == null ? "no price quoted" : `${o.currency} ${o.price.toFixed(2)}`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const money = (o) =>
-  o.price == null ? "no price quoted" : `${o.currency} ${o.price.toFixed(2)}`;
+/* ---------- the form ---------- */
 
-function markClass(r) {
-  if (r.judgement === "satisfied") return "ok";
-  if (r.judgement === "violated") return r.hard ? "no" : "soft";
-  return "unk";
+function el(tag, cls, attrs = {}) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  return node;
 }
-function markGlyph(r) {
-  if (r.judgement === "satisfied") return "✓";
-  if (r.judgement === "violated") return r.hard ? "✗" : "~";
-  return "?";
+
+function constraintRow(c = {}) {
+  const row = el("div", "grid constraint");
+  const kind = el("select", null, { "aria-label": "requirement type" });
+  kind.innerHTML = KINDS.map((k) =>
+    `<option value="${k}"${k === (c.kind || "budget") ? " selected" : ""}>${k.replace("_", " ")}</option>`
+  ).join("");
+  const desc = el("input", null, { placeholder: "what it means, in your words", "aria-label": "description" });
+  desc.value = c.description || "";
+  const value = el("input", null, { placeholder: "500 / 2026-09-11", "aria-label": "value" });
+  value.value = c.value == null ? "" : String(c.value);
+  const hard = el("select", null, { "aria-label": "hard or soft" });
+  hard.innerHTML = `<option value="1"${c.hard === false ? "" : " selected"}>must</option>` +
+                   `<option value="0"${c.hard === false ? " selected" : ""}>prefer</option>`;
+  const del = el("button", "del", { type: "button", "aria-label": "remove requirement" });
+  del.textContent = "×";
+  del.onclick = () => row.remove();
+  row.append(kind, desc, value, hard, del);
+  return row;
 }
+
+function orgRow(o = {}) {
+  const row = el("div", "grid org");
+  const name = el("input", null, { placeholder: "organisation", "aria-label": "name" });
+  name.value = o.name || "";
+  const phone = el("input", null, { placeholder: "+15550100001", "aria-label": "phone", inputmode: "tel" });
+  phone.value = o.phone || "";
+  const role = el("input", null, { placeholder: "why them (optional)", "aria-label": "role" });
+  role.value = o.role || "";
+  const del = el("button", "del", { type: "button", "aria-label": "remove organisation" });
+  del.textContent = "×";
+  del.onclick = () => row.remove();
+  row.append(name, phone, role, del);
+  return row;
+}
+
+function fillForm(def) {
+  $("goal").value = def.goal || "";
+  $("constraints").replaceChildren(...(def.constraints || []).map(constraintRow));
+  $("orgs").replaceChildren(...(def.organizations || []).map(orgRow));
+  if (!$("orgs").children.length) $("orgs").append(orgRow());
+  $("max-calls").value = (def.budget || {}).max_calls ?? 6;
+  $("max-per-org").value = (def.budget || {}).max_calls_per_org ?? 2;
+  $("error").textContent = "";
+}
+
+function collect() {
+  const constraints = [...$("constraints").children].map((row) => {
+    const [kind, desc, value, hard] = row.children;
+    return {
+      kind: kind.value,
+      description: desc.value.trim(),
+      value: value.value.trim(),
+      hard: hard.value === "1",
+    };
+  }).filter((c) => c.description || c.value);
+  const organizations = [...$("orgs").children].map((row) => {
+    const [name, phone, role] = row.children;
+    return { name: name.value.trim(), phone: phone.value.trim(), role: role.value.trim() };
+  }).filter((o) => o.name || o.phone);
+  return {
+    goal: $("goal").value.trim(),
+    constraints,
+    organizations,
+    budget: {
+      max_calls: Number($("max-calls").value),
+      max_calls_per_org: Number($("max-per-org").value),
+    },
+  };
+}
+
+async function parseGoal() {
+  const text = $("goal").value.trim();
+  if (!text) return;
+  $("parse").disabled = true;
+  try {
+    const res = await fetch("/api/interpret", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (!res.ok) { $("error").textContent = data.error; return; }
+    $("goal").value = data.goal;
+    // Replace rather than merge: the parse is a fresh reading of the sentence,
+    // and silently keeping a stale requirement beside it is how a user ends up
+    // running against limits they think they removed.
+    $("constraints").replaceChildren(...data.constraints.map(constraintRow));
+    $("error").textContent = data.constraints.length
+      ? "" : "Nothing in that sentence reads as a requirement. Add them by hand below.";
+  } finally {
+    $("parse").disabled = false;
+  }
+}
+
+/* ---------- the timeline ---------- */
+
+const markClass = (r) => r.judgement === "satisfied" ? "ok"
+  : r.judgement === "violated" ? (r.hard ? "no" : "soft") : "unk";
+const markGlyph = (r) => r.judgement === "satisfied" ? "✓"
+  : r.judgement === "violated" ? (r.hard ? "✗" : "~") : "?";
 const checks = (results) => `<ul class="checks">${results.map((r) =>
   `<li class="${markClass(r)}"><span class="m">${markGlyph(r)}</span><span>${esc(r.detail)}</span></li>`
 ).join("")}</ul>`;
 
-function chips(constraints) {
-  $("chips").innerHTML = (constraints || []).map((c) =>
-    `<span class="chip"><b>${esc(c.kind)}</b> · ${esc(c.description)}${c.hard ? "" : " (soft)"}</span>`
-  ).join("");
-}
-
 function step(cls, html) {
-  const el = document.createElement("div");
-  el.className = `step ${cls}`;
-  el.innerHTML = `<span class="dot"></span>${html}`;
-  $("timeline").appendChild(el);
-  el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  return el;
+  const node = el("div", `step ${cls}`);
+  node.innerHTML = `<span class="dot"></span>${html}`;
+  $("timeline").appendChild(node);
+  node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  return node;
 }
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function renderEvent(e) {
   switch (e.kind) {
@@ -203,7 +352,7 @@ function renderEvent(e) {
         <div class="sub"><span class="phone">${esc(e.phone)}</span></div>
         <div class="lead">${esc(e.reason)}</div>`);
     case "evidence": {
-      const good = ["confirmed"].includes(e.verdict);
+      const good = e.verdict === "confirmed";
       const bad = ["blocked", "refused", "no_answer"].includes(e.verdict);
       let html = `<h3>${esc(e.org || "")} — ${esc(e.verdict.replace("_", " "))}</h3>`;
       const items = (e.facts || []).map((f) => `<li>${esc(f)}</li>`)
@@ -237,13 +386,14 @@ function renderApproval(e) {
       <p class="q">${esc(e.prompt)}</p>
       ${e.evaluation ? checks(e.evaluation.results) : ""}
       ${rejected ? `<div class="rejected">${rejected}</div>` : ""}
-      <div class="row">
-        <button id="yes">Approve</button>
-        <button id="no" class="ghost">Decline</button>
+      <div class="foot">
+        <button id="yes" type="button">Approve</button>
+        <button id="no" class="ghost" type="button">Decline</button>
       </div>
     </div>`;
   $("yes").onclick = () => decide(true);
   $("no").onclick = () => decide(false);
+  $("approval").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 function renderResult(e, ok) {
@@ -257,7 +407,7 @@ function renderResult(e, ok) {
       <p class="headline">${esc(e.headline)}</p>
       ${e.reference ? `<div>Reference <span class="ref">${esc(e.reference)}</span></div>` : ""}
       ${e.why ? `<div class="sub">${esc(e.why)}</div>` : ""}
-      ${e.constraint_report && e.constraint_report.length ? checks(e.constraint_report) : ""}
+      ${(e.constraint_report || []).length ? checks(e.constraint_report) : ""}
       <div class="meta">${e.calls_placed} of ${e.call_budget} calls used.</div>
       <div class="meta">${parties}</div>
     </div>`;
@@ -266,7 +416,7 @@ function renderResult(e, ok) {
 
 async function play(events) {
   for (const e of events) {
-    if (e.kind === "started") { chips(); continue; }
+    if (e.kind === "started") continue;
     if (e.kind === "approval_required") { await sleep(STEP_DELAY); renderApproval(e); return; }
     if (e.kind === "resolved")  { await sleep(STEP_DELAY); renderResult(e, true);  return; }
     if (e.kind === "abandoned") { await sleep(STEP_DELAY); renderResult(e, false); return; }
@@ -274,20 +424,26 @@ async function play(events) {
   }
 }
 
+/* ---------- running ---------- */
+
 async function start() {
+  $("error").textContent = "";
+  const outcome = collect();
+  if (!outcome.goal) { $("error").textContent = "Say what needs to happen."; return; }
   $("start").disabled = true;
   $("timeline").innerHTML = ""; $("approval").innerHTML = ""; $("result").innerHTML = "";
-  const body = { scenario: $("scenario").value, text: $("goal").value };
-  const res = await fetch("/api/runs", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) { step("bad", `<h3>Could not start</h3><div class="sub">${esc(data.error)}</div>`);
-                 $("start").disabled = false; return; }
-  runId = data.outcome.id;
-  chips(data.outcome.constraints);
-  await play(data.events);
-  $("start").disabled = false;
+  try {
+    const res = await fetch("/api/runs", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scenario: $("scenario").value, outcome }),
+    });
+    const data = await res.json();
+    if (!res.ok) { $("error").textContent = data.error; return; }
+    runId = data.outcome.id;
+    await play(data.events);
+  } finally {
+    $("start").disabled = false;
+  }
 }
 
 async function decide(approve) {
@@ -301,20 +457,31 @@ async function decide(approve) {
   await play(data.events);
 }
 
+/* ---------- boot ---------- */
+
+function currentScenario() {
+  return scenarios.find((s) => s.name === $("scenario").value);
+}
+
 async function boot() {
-  const res = await fetch("/api/scenarios");
-  scenarios = (await res.json()).scenarios;
-  $("scenario").innerHTML = scenarios.map((s) =>
-    `<option value="${esc(s.name)}">${esc(s.title)}</option>`).join("");
-  const first = scenarios[0];
-  if (first) { $("goal").value = first.goal; }
-  $("scenario").onchange = () => {
-    const s = scenarios.find((x) => x.name === $("scenario").value);
-    if (s) $("goal").value = s.goal;
-  };
-  const { live } = await (await fetch("/api/mode")).json();
+  live = (await (await fetch("/api/mode")).json()).live;
   $("mode").textContent = live ? "live · real calls" : "mock · no calls placed";
   $("mode").className = live ? "mode live" : "mode";
+  $("phonebook-hint").textContent = live
+    ? "These numbers will be dialled. E.164 only, e.g. +15550100001."
+    : "Mock mode replays the selected scenario's script. A number the scenario "
+      + "does not cover comes back as no answer — which is a real path worth watching.";
+
+  scenarios = (await (await fetch("/api/scenarios")).json()).scenarios;
+  $("scenario").innerHTML = scenarios.map((s) =>
+    `<option value="${esc(s.name)}">${esc(s.title)}</option>`).join("");
+  if (scenarios[0]) fillForm(scenarios[0].outcome);
+
+  $("scenario").onchange = () => fillForm(currentScenario().outcome);
+  $("reset").onclick = () => fillForm(currentScenario().outcome);
+  $("add-constraint").onclick = () => $("constraints").append(constraintRow());
+  $("add-org").onclick = () => $("orgs").append(orgRow());
+  $("parse").onclick = parseGoal;
   $("start").onclick = start;
 }
 boot();

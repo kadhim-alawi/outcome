@@ -53,14 +53,18 @@ WHAT NEEDS TO HAPPEN?
 SCENARIO  ▾ Damaged pallet, replacement needed before Friday        [ Start ]
 ```
 
-The free-text box is parsed into a goal plus constraint chips
-(`interpret.py`). **The chips are always shown before the run starts.** A
-budget that silently failed to parse is a budget that never blocks anything, so
-the parse is surfaced rather than trusted.
+"Read the requirements out of this" parses the sentence into a goal plus
+constraint rows (`interpret.py`, `POST /api/interpret`). **The parse is never
+acted on silently.** It lands in editable fields — kind, description, value,
+must/prefer — because a budget that quietly failed to parse is a budget that
+will never block anything, and the user is the only one who can catch it.
 
-*Not built:* the chips are display-only. They must become editable, and the
-form must accept a starting phone book (name + E.164 + role) rather than taking
-it from the scenario file. See §14.
+The parse **replaces** the requirement rows rather than merging with them, for
+the same reason the API does (§12): a stale requirement sitting beside a fresh
+reading of the sentence is a limit the user thinks they removed.
+
+Below it, the phone book (name, E.164, role) and the call budget are editable
+too. One organisation is enough — that is the point of the product.
 
 ### 3.2 Timeline
 
@@ -131,10 +135,13 @@ winner asks the user to trust a search they cannot see.
 
 ### Constraint
 
-`kind` ∈ `budget` · `deadline` · `required_fact` · `preference` · `forbidden`.
+`kind` ∈ `budget` · `minimum` · `deadline` · `required_fact` · `preference` · `forbidden`.
 `hard: true` disqualifies an offer; `hard: false` only ranks it. `value` is a
-bare number for `budget`, an ISO date for `deadline`, a field name for
-`required_fact`, a term for the rest.
+bare number for `budget` and `minimum`, an ISO date for `deadline`, a field name
+for `required_fact`, a term for the rest.
+
+`budget` is a ceiling, `minimum` a floor. Which one is present also decides what
+"better" means when ranking acceptable offers — see §9.
 
 ### Organization
 
@@ -160,7 +167,11 @@ plus `facts[]`, `blockers[]`, `referrals[]`, `offer`, `call_id`.
 
 `summary`, `org_id`, `price`, `currency`, `eta` (ISO date), `reference`. The
 only structure a constraint can be evaluated against. `price: null` means *not
-quoted*, which reads as unknown — never as free.
+quoted*, which reads as unknown — never as free, and never as generous.
+
+`price` is *the amount at stake*, not *the cost*. Whether more or less is better
+is decided by the constraints, so an outcome that recovers a refund and one that
+buys a replacement are the same shape with the comparison reversed.
 
 ### SQLite schema (specified, **not built**)
 
@@ -375,8 +386,13 @@ operator decides whether it is good enough.
 `unknown` deliberately does not block: refusing every offer that failed to
 mention a detail nobody asked about would strand every run.
 
-Ranking among acceptable offers: fewest soft violations, then cheapest, then
-earliest. An unquoted price sorts **last**, not free.
+Ranking among acceptable offers: fewest soft violations, then the better
+amount, then the earlier date. "Better" follows the constraints — a `budget`
+makes cheaper better, a `minimum` makes larger better. With both, or neither,
+cheaper wins: a cost ceiling is the commoner case, and a run carrying both is
+asking for a price inside a band rather than at an extreme.
+
+An unquoted amount sorts **last in either direction**.
 
 ---
 
@@ -426,8 +442,9 @@ considered with the reason it lost.
 |---|---|---|---|
 | `GET` | `/` | | the single page |
 | `GET` | `/api/mode` | | `{live: bool}` — the UI badge |
-| `GET` | `/api/scenarios` | | `[{name, title, description, goal}]` |
-| `POST` | `/api/runs` | `{scenario, text?}` | `{outcome, events, event_count, live}` |
+| `GET` | `/api/scenarios` | | `[{name, title, description, featured, outcome}]`, featured first |
+| `POST` | `/api/interpret` | `{text}` | `{goal, constraints, source}` — for the form to show back |
+| `POST` | `/api/runs` | `{scenario, outcome?}` | `{outcome, events, event_count, live}` |
 | `GET` | `/api/runs/{id}` | | same snapshot |
 | `POST` | `/api/decide` | `{run_id, approve, reason?}` | snapshot of **events since the decision** |
 
@@ -438,6 +455,18 @@ and would mean holding a socket open for the length of a phone call.
 `scenario` is resolved inside `scenarios/` and re-checked after resolution —
 it arrives from an HTTP request, and `../../etc/passwd` is otherwise a file read.
 
+When `outcome` is present it **replaces** the scenario's definition rather than
+merging into it. A partial merge would let a form that dropped a constraint
+inherit it back from the file, and the user would be running against limits they
+believed they had deleted.
+
+`outcome/loader.py` is where untrusted input becomes a run, so it is where phone
+numbers are checked as strict E.164 (no normalising — a guessed digit dials a
+stranger), duplicates are rejected, budget and minimum values must parse as
+numbers, deadlines as ISO dates, and the call budget is capped at 25 total and 5
+per organisation. A limit that fails to parse is a limit that never blocks
+anything, so it is an error rather than a warning.
+
 *Not built:* no auth. Bind to localhost. See §14.
 
 ---
@@ -447,8 +476,9 @@ it arrives from an HTTP request, and `../../etc/passwd` is otherwise a file read
 ```
 outcome/{models,constraints,evidence,planner,approval,engine,calle,interpret,loader,cli,server}.py
 scenarios/*.json         outcome definition + scripted responses for the mock
-web/index.html           the timeline UI
-tests/                   39 tests, stdlib unittest, no network
+web/index.html           the form and the timeline UI
+contrib/skills/          the outcome-completion-agent package for the upstream PR
+tests/                   51 tests, stdlib unittest, no network
 docs/                    this file, the landscape teardown, the demo script
 ```
 
@@ -464,19 +494,21 @@ Honest list, in the order it should be closed.
    call to a number we control, then the full scenario. Budget 6 of the 20
    free credits for this and request the additional 200 now — the form takes
    one to five business days.
-2. **Constraint chips are display-only.** They must be editable before Start,
-   and the form must take a starting phone book instead of reading it from the
-   scenario file.
-3. **SQLite.** Schema in §4. Needed before any run outlives a process — in
+2. **SQLite.** Schema in §4. Needed before any run outlives a process — in
    particular the `calls` ledger, without which a restart re-dials.
-4. **Server has no auth.** Localhost only until it does.
-5. **`ASK_USER` parks the run and nothing resumes it.** The planner never emits
+3. **Server has no auth.** Localhost only until it does.
+4. **`ASK_USER` parks the run and nothing resumes it.** The planner never emits
    one today; the moment it does, the UI needs the matching input.
-6. **`LLMInterpreter` is untested against the live API.** It falls back to rules
+5. **`LLMInterpreter` is untested against the live API.** It falls back to rules
    on any failure, so a break degrades the parse rather than the run — but the
    success path has only been exercised offline.
-7. **One scenario.** A second (bill dispute or appointment hunt) would prove the
-   engine is not shaped around this one story.
+6. **No time-of-day window.** See §16; this should land before any live run
+   against a business.
+
+Closed since the first draft: the form is editable and takes a phone book (§3.1);
+a second scenario of a different shape runs on the same engine (`bill-dispute`,
+which added the `minimum` constraint kind and nothing else); the upstream skill
+package is written and passes that repository's validator (§15).
 
 ---
 
@@ -487,20 +519,36 @@ The hackathon requires a PR to
 Judged partly on whether the contribution is *reusable by the community*, so it
 should not be a copy of this demo.
 
-**Proposal — a skill, not an app.** `skills/outcome-completion-agent/`, packaging
-the pattern rather than the bakery story:
+**Built.** `contrib/skills/outcome-completion-agent/` — a skill, not an app,
+packaging the pattern rather than the bakery story:
 
 ```
-skills/outcome-completion-agent/
-├── SKILL.md                          the loop, the gate, the budget
+outcome-completion-agent/
+├── SKILL.md                            the loop, the gate, the budget
 ├── references/
-│   ├── evidence-schema.md            §7.1 — the reusable part
-│   ├── constraint-evaluation.md      §9, incl. why unknown does not block
-│   ├── approval-gate.md              §10, incl. the negation problem
-│   └── safety.md                     disclosure, masking, E.164, cancellation
+│   ├── evidence-schema.md              §7.1 — the reusable part
+│   ├── constraint-evaluation.md        §9, incl. why unknown does not block
+│   ├── approval-gate.md                §10, incl. the negation problem
+│   ├── safety.md                       disclosure, masking, E.164, cancellation
+│   └── examples.md                     a full run, a budget stop, two failure modes
 └── scripts/
-    └── check_evidence_schema.py      validates a structured_result, no network
+    ├── check_evidence_schema.py        validates a structured_result, no network
+    └── test_check_evidence_schema.py   19 tests
 ```
+
+Verified against a fresh clone of the upstream repository at `100eb25`:
+
+```
+$ cp -r contrib/skills/outcome-completion-agent <clone>/skills/
+$ python3 scripts/validate_repository.py
+Repository validation passed.
+$ python3 scripts/check_branch_name.py --branch feat/outcome-completion-agent
+Branch name follows docs/git-naming-conventions.md
+```
+
+**Still to do:** fork, copy the directory in, commit on
+`feat/outcome-completion-agent`, open the PR, and put its URL in the Devpost
+submission. This session has read-only access to that repository.
 
 Repository rules to honour (from its `CONTRIBUTING.md` and `AGENTS.md`):
 English only; no `README.md` inside a skill directory; `name` matches the

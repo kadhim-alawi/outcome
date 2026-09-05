@@ -14,11 +14,13 @@ from outcome.engine import Engine
 from outcome.loader import load_scenario
 from outcome.models import OutcomeStatus
 
-SCENARIO = str(Path(__file__).resolve().parent.parent / "scenarios" / "supplier-replacement.json")
+SCENARIOS = Path(__file__).resolve().parent.parent / "scenarios"
+SCENARIO = str(SCENARIOS / "supplier-replacement.json")
+BILL_DISPUTE = str(SCENARIOS / "bill-dispute.json")
 
 
-def build(**overrides):
-    scenario, outcome = load_scenario(SCENARIO)
+def build(path: str = SCENARIO, **overrides):
+    scenario, outcome = load_scenario(path)
     for key, value in overrides.items():
         setattr(outcome.budget, key, value)
     events: list[dict] = []
@@ -178,6 +180,70 @@ class Persistence(unittest.TestCase):
         self.assertEqual(restored.to_dict(), outcome.to_dict())
         self.assertEqual(restored.calls_placed(), 5)
         self.assertIs(restored.status, OutcomeStatus.RESOLVED)
+
+
+class SecondScenario(unittest.TestCase):
+    """The bill dispute has a different shape from the supplier run: escalation
+    inside one company rather than across a supply chain, and a value floor
+    instead of a cost ceiling. It runs on the same engine with no special
+    casing, which is the only claim worth testing here."""
+
+    def test_climbs_an_escalation_chain_to_a_full_reversal(self):
+        engine, outcome, _ = build(BILL_DISPUTE)
+        engine.run(outcome)
+        engine.approve(outcome, outcome.pending_approval_action_id)
+
+        self.assertIs(outcome.status, OutcomeStatus.RESOLVED)
+        self.assertEqual(outcome.resolution["reference"], "CR-77310")
+        self.assertEqual(outcome.resolution["offer"]["price"], 62.5)
+        self.assertEqual(outcome.calls_placed(), 4)
+
+    def test_the_goodwill_offer_is_rejected_for_being_too_small(self):
+        engine, outcome, events = build(BILL_DISPUTE)
+        engine.run(outcome)
+        low = next(
+            e for e in events
+            if e["kind"] == "evidence" and (e.get("offer") or {}).get("price") == 40.0
+        )
+        self.assertFalse(low["acceptable"])
+        self.assertIn("short of the USD 62.50", str(low["constraint_report"]))
+
+    def test_both_further_departments_were_discovered_on_calls(self):
+        engine, outcome, _ = build(BILL_DISPUTE)
+        engine.run(outcome)
+        self.assertEqual(sum(1 for o in outcome.organizations if o.discovered_by), 2)
+
+    def test_the_floor_is_stated_in_the_call_script(self):
+        _engine, outcome, _ = build(BILL_DISPUTE)
+        from outcome.planner import FrontierPlanner
+
+        action = FrontierPlanner().next_action(outcome)
+        self.assertIn("at least 62.5", action.task_prompt)
+
+
+class EveryScenario(unittest.TestCase):
+    def test_each_scenario_runs_to_a_terminal_state(self):
+        for path in sorted(SCENARIOS.glob("*.json")):
+            with self.subTest(scenario=path.stem):
+                engine, outcome, _ = build(str(path))
+                engine.run(outcome)
+                if outcome.status is OutcomeStatus.AWAITING_APPROVAL:
+                    engine.approve(outcome, outcome.pending_approval_action_id)
+                self.assertTrue(outcome.is_terminal(), outcome.status)
+                self.assertIsNotNone(outcome.resolution)
+                self.assertLessEqual(outcome.calls_placed(), outcome.budget.max_calls)
+
+    def test_no_scenario_uses_a_number_outside_the_fiction_range(self):
+        import json
+        import re
+
+        for path in sorted(SCENARIOS.glob("*.json")):
+            numbers = set(re.findall(r'"\+\d{6,15}"', path.read_text(encoding="utf-8")))
+            for number in numbers:
+                with self.subTest(scenario=path.stem, number=number):
+                    self.assertRegex(number, r'^"\+1555010\d{4}"$')
+            self.assertTrue(numbers, f"{path.stem} has no phone numbers")
+            json.loads(path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ problem rather than a list of numbers to dial.
 
 from __future__ import annotations
 
+import re
 import uuid
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
@@ -39,6 +40,7 @@ def new_id(prefix: str) -> str:
 class ConstraintKind(str, Enum):
     DEADLINE = "deadline"
     BUDGET = "budget"
+    MINIMUM = "minimum"
     REQUIRED_FACT = "required_fact"
     PREFERENCE = "preference"
     FORBIDDEN = "forbidden"
@@ -109,6 +111,15 @@ class Organization:
             discovered_by=d.get("discovered_by"),
             id=d.get("id") or new_id("org"),
         )
+
+
+E164 = re.compile(r"^\+[1-9]\d{6,14}$")
+
+
+def is_e164(phone: str) -> bool:
+    """Strict. A number that needs normalising to pass is a number we are
+    guessing at, and a guessed digit dials a stranger."""
+    return bool(E164.match((phone or "").strip()))
 
 
 def mask_phone(phone: str) -> str:
@@ -233,6 +244,11 @@ class Offer:
 
     summary: str
     org_id: str
+    # The amount at stake. Which direction is *better* is decided by the
+    # constraints, not by this field: a `budget` makes it a cost to stay under,
+    # a `minimum` makes it a value to clear. An outcome that recovers a refund
+    # and one that buys a replacement are the same shape with the comparison
+    # reversed.
     price: float | None = None
     currency: str = "USD"
     eta: str | None = None

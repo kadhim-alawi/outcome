@@ -1,0 +1,119 @@
+{
+  "name": "bill-dispute",
+  "title": "Unexplained $87 increase on a mobile bill",
+  "description": "A sole trader's September mobile bill is $87.32 higher than usual with no explanation. Part of it turns out to be legitimate; part is a duplicated add-on. Getting the incorrect part credited means climbing an escalation chain inside one company, because the first two people reached cannot authorise a credit that size. Every phone number is in the +1-555-01xx range reserved for fiction, and no call is placed: this scenario drives the mock transport.",
+  "outcome": {
+    "goal": "Find out why the September mobile bill on account 4471-88 is USD 87.32 higher than usual, and get any incorrect charge credited back.",
+    "budget": {"max_calls": 6, "max_calls_per_org": 2, "max_actions": 20},
+    "constraints": [
+      {"kind": "minimum", "description": "At least the USD 62.50 identified as incorrect, credited back", "value": 62.5, "hard": true},
+      {"kind": "deadline", "description": "Credit applied on or before 12 September", "value": "2026-09-12", "hard": true},
+      {"kind": "required_fact", "description": "A credit reference number", "value": "reference", "hard": false}
+    ],
+    "organizations": [
+      {"name": "Meridian Mobile customer service", "phone": "+15550100011", "role": "General enquiries line on the bill"}
+    ]
+  },
+  "responses": [
+    {
+      "phone": "+15550100011",
+      "attempt": 1,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "partial",
+        "facts": [
+          "The increase is USD 87.32 across two lines on the September bill.",
+          "USD 24.82 is roaming used on 3 and 4 September, which the account holder confirms is correct.",
+          "USD 62.50 is a second 'Unlimited Data Boost' added on 1 September while one was already active.",
+          "The duplicate add-on is visible in their system and was not requested."
+        ],
+        "blockers": ["Customer service can only authorise credits up to USD 50."],
+        "referrals": [
+          {
+            "org_name": "Meridian Mobile billing team",
+            "phone": "+15550100012",
+            "role": "Billing corrections desk",
+            "reason": "Credits above USD 50 have to be raised by billing."
+          }
+        ],
+        "offer": null
+      }
+    },
+    {
+      "phone": "+15550100012",
+      "attempt": 1,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "offer",
+        "facts": [
+          "Billing can see the duplicate add-on and agrees it was not requested.",
+          "Their standard goodwill credit for a duplicated add-on is USD 40.00.",
+          "A full reversal of a charge already invoiced needs account retentions."
+        ],
+        "blockers": [],
+        "referrals": [
+          {
+            "org_name": "Meridian Mobile account retentions",
+            "phone": "+15550100013",
+            "role": "Retentions, authorised for full reversals",
+            "reason": "Billing say retentions can reverse the whole charge rather than issue goodwill."
+          }
+        ],
+        "offer": {
+          "summary": "Goodwill credit for the duplicated data add-on",
+          "price": 40.0,
+          "currency": "USD",
+          "eta": "2026-09-09",
+          "reference": null
+        }
+      }
+    },
+    {
+      "phone": "+15550100013",
+      "attempt": 1,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "offer",
+        "facts": [
+          "Retentions confirm the second add-on was applied in error on 1 September.",
+          "They can reverse the full USD 62.50 rather than issue a goodwill credit.",
+          "The roaming charge of USD 24.82 stands and is not in dispute."
+        ],
+        "blockers": [],
+        "referrals": [],
+        "offer": {
+          "summary": "Full reversal of the duplicated Unlimited Data Boost",
+          "price": 62.5,
+          "currency": "USD",
+          "eta": "2026-09-08",
+          "reference": null
+        }
+      }
+    },
+    {
+      "phone": "+15550100013",
+      "attempt": 2,
+      "status": "completed",
+      "structured": {
+        "reached": true,
+        "verdict": "confirmed",
+        "facts": [
+          "Reversal raised against account 4471-88.",
+          "It will appear on the next statement rather than as a refund to the card."
+        ],
+        "blockers": [],
+        "referrals": [],
+        "offer": {
+          "summary": "Full reversal of the duplicated Unlimited Data Boost",
+          "price": 62.5,
+          "currency": "USD",
+          "eta": "2026-09-08",
+          "reference": "CR-77310"
+        }
+      }
+    }
+  ]
+}

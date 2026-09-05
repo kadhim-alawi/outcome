@@ -25,7 +25,7 @@ from typing import Any
 
 from .calle import CalleClient, MockCalleClient
 from .engine import Engine
-from .loader import load_scenario, outcome_from_request
+from .loader import DefinitionError, interpret_request, load_scenario, outcome_from_definition
 from .models import Outcome, OutcomeStatus
 
 WEB_ROOT = Path(__file__).resolve().parent.parent / "web"
@@ -75,22 +75,20 @@ def _scenario_path(name: str) -> Path:
 
 
 def _make_runner(body: dict[str, Any], live: bool) -> Runner:
+    """Build a run from the request.
+
+    The scenario is always loaded, because in mock mode it supplies the scripted
+    answers. What the user edited in the form replaces the scenario's *outcome*
+    definition wholesale when it is present — a partial merge would let a form
+    that dropped a constraint silently inherit it back from the file, and the
+    user would be running against limits they thought they had deleted.
+    """
     name = str(body.get("scenario") or "supplier-replacement")
     scenario, outcome = load_scenario(str(_scenario_path(name)))
 
-    text = str(body.get("text") or "").strip()
-    if text:
-        # The typed request wins over the scenario's canned goal, but the
-        # scenario still supplies the phone book — a mock run can only replay
-        # numbers it has scripted answers for.
-        typed = outcome_from_request(
-            text,
-            organizations=[o.to_dict() for o in outcome.organizations],
-            budget=outcome.budget.to_dict(),
-        )
-        if typed.constraints:
-            outcome.goal = typed.goal
-            outcome.constraints = typed.constraints
+    definition = body.get("outcome")
+    if isinstance(definition, dict) and str(definition.get("goal") or "").strip():
+        outcome = outcome_from_definition(definition)
 
     if live:
         transport = CalleClient(
@@ -156,6 +154,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         body = self._read_json()
+        if self.path == "/api/interpret":
+            return self._interpret(body)
         if self.path == "/api/runs":
             return self._start(body)
         if self.path == "/api/decide":
@@ -176,15 +176,25 @@ class Handler(BaseHTTPRequestHandler):
                     "name": path.stem,
                     "title": data.get("title", path.stem),
                     "description": data.get("description", ""),
-                    "goal": (data.get("outcome") or {}).get("goal", ""),
+                    "featured": bool(data.get("featured")),
+                    "outcome": data.get("outcome") or {},
                 }
             )
+        # Featured first, so the flagship demo is what the page opens on rather
+        # than whichever scenario happens to sort first alphabetically.
+        out.sort(key=lambda s: (not s["featured"], s["name"]))
         return out
+
+    def _interpret(self, body: dict[str, Any]) -> None:
+        text = str(body.get("text") or "").strip()
+        if not text:
+            return self._json(400, {"error": "Nothing to read."})
+        return self._json(200, interpret_request(text))
 
     def _start(self, body: dict[str, Any]) -> None:
         try:
             runner = _make_runner(body, self.live)
-        except ValueError as exc:
+        except (DefinitionError, ValueError) as exc:
             return self._json(400, {"error": str(exc)})
         except KeyError:
             return self._json(400, {"error": "Live mode needs CALLE_API_KEY."})

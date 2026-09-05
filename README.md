@@ -68,8 +68,9 @@ call unless you ask for `--live`.
 
 ```bash
 python3 -m outcome.cli run scenarios/supplier-replacement.json     # terminal
+python3 -m outcome.cli run scenarios/bill-dispute.json             # a different shape
 python3 -m outcome.server                                          # http://127.0.0.1:8765
-python3 -m unittest discover -s tests                              # 39 tests
+python3 -m unittest discover -s tests                              # 51 tests
 ```
 
 The CLI stops at the approval gate and asks. `--approve auto` answers yes,
@@ -91,6 +92,22 @@ sent to `api.heycall-e.com` (see `ALLOWED_HOSTS` in `outcome/calle.py`).
 
 Phone numbers in this repository are all in the `+1-555-01xx` range reserved
 for fiction.
+
+## The second scenario
+
+The same engine, a different shape, no special casing. A sole trader's mobile bill is $87.32
+higher than usual. Part of it is legitimate roaming; part is an add-on that was applied
+twice. Getting the wrong part back means climbing an escalation chain *inside one company* —
+customer service can only authorise $50, billing offers a $40 goodwill credit, and only
+retentions can reverse the charge in full.
+
+The constraint that drives it is a **floor**, not a ceiling: at least the $62.50 identified
+as incorrect. Billing's $40 offer is a perfectly successful phone call and an unacceptable
+outcome, so the agent keeps climbing.
+
+```bash
+python3 -m outcome.cli run scenarios/bill-dispute.json
+```
 
 ## How it decides
 
@@ -122,6 +139,11 @@ after, so an approval that sat overnight cannot spend a credit the budget no
 longer has. A CALL-E hackathon account holds 20 calls; the default budget is 6
 per outcome and 2 per organisation.
 
+**Which direction is "better" comes from the constraints.** A `budget` makes
+cheaper better; a `minimum` makes larger better. Buying a replacement and
+recovering a refund are the same machinery pointed the other way — which is
+what the second scenario is there to prove.
+
 ## Layout
 
 ```
@@ -137,8 +159,24 @@ outcome/
   cli.py          watch a run in a terminal
   server.py       watch a run in a browser
 scenarios/        scripted runs for the mock transport
-web/index.html    the timeline UI
+web/index.html    the form and the timeline UI
+contrib/skills/   the outcome-completion-agent skill, for the upstream PR
 docs/SPEC.md      the build specification
+```
+
+## The upstream contribution
+
+The hackathon requires a PR to
+[`CALLE-AI/awesome-phone-call-agents`](https://github.com/CALLE-AI/awesome-phone-call-agents).
+`contrib/skills/outcome-completion-agent/` is that contribution, ready to copy into a
+checkout of that repository. It packages the *pattern* — evidence, constraints, frontier,
+approval gate — rather than this demo, because 40 skills and 75 apps there are already
+one-workflow entries.
+
+It passes the upstream `scripts/validate_repository.py` and carries its own tests:
+
+```bash
+python3 contrib/skills/outcome-completion-agent/scripts/test_check_evidence_schema.py
 ```
 
 ## Documents
@@ -152,8 +190,12 @@ docs/SPEC.md      the build specification
 ## Status
 
 The engine, the CALL-E adapter, the CLI, the server and the UI work and are
-tested end to end against the mock transport. `--live` is implemented against
-the documented v0.6.0 contract but has **not yet been run against a real
-account**. See the SPEC's "What is not built yet" section.
+tested end to end against the mock transport, across two scenarios of different
+shapes. The upstream skill package is written and passes that repository's own
+validator.
+
+`--live` is implemented against the documented v0.6.0 contract but has **not yet
+been run against a real account**. See the SPEC's
+[what is not built yet](docs/SPEC.md#14-what-is-not-built-yet).
 
 MIT licensed.

@@ -144,5 +144,7 @@ class ApprovalRequest:
             if self.offer.price is not None
             else "an unquoted amount"
         )
-        when = f", arriving {self.offer.eta}" if self.offer.eta else ""
+        # "on", not "arriving": the same field carries a delivery date on one
+        # outcome and the date a credit lands on another.
+        when = f" on {self.offer.eta}" if self.offer.eta else ""
         return f"Accept {self.offer.summary} from {where} for {price}{when}?"

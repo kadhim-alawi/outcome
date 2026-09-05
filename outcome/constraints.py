@@ -74,14 +74,29 @@ class Evaluation:
         return [r for r in self.results if r.judgement is Judgement.UNKNOWN]
 
     def score(self) -> tuple[int, float, float]:
-        """Sort key for picking between acceptable offers: fewest soft
-        violations, then cheapest, then earliest. Unknown price sorts last
-        rather than free."""
+        """Sort key for picking between acceptable offers.
+
+        Fewest soft violations, then the better amount, then the earlier date.
+        "Better" depends on which way the constraints point: a budget makes
+        cheaper better, a minimum makes larger better. With both, or neither,
+        cheaper wins — a cost ceiling is the commoner case, and a run carrying
+        both is asking for a price inside a band rather than an extreme.
+
+        An unquoted amount sorts last in either direction. It is unknown, not
+        free and not generous.
+        """
         soft = sum(1 for r in self.violations if not r.constraint.hard)
-        price = self.offer.price if self.offer.price is not None else float("inf")
+        kinds = {r.constraint.kind for r in self.results}
+        larger_is_better = (
+            ConstraintKind.MINIMUM in kinds and ConstraintKind.BUDGET not in kinds
+        )
+        if self.offer.price is None:
+            price_key = float("inf")
+        else:
+            price_key = -self.offer.price if larger_is_better else self.offer.price
         eta = _parse_date(self.offer.eta)
         eta_key = eta.toordinal() if eta else float("inf")
-        return (soft, price, eta_key)
+        return (soft, price_key, eta_key)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +146,29 @@ def _evaluate_one(constraint: Constraint, offer: Offer) -> ConstraintResult:
             constraint,
             Judgement.SATISFIED,
             f"{offer.currency} {offer.price:.2f} is within the {offer.currency} {limit:.2f} limit.",
+        )
+
+    if kind is ConstraintKind.MINIMUM:
+        floor = _as_float(constraint.value)
+        if floor is None:
+            return ConstraintResult(constraint, Judgement.UNKNOWN, "No numeric floor set.")
+        if offer.price is None:
+            return ConstraintResult(
+                constraint, Judgement.UNKNOWN, "No amount was named on the call."
+            )
+        if offer.price < floor:
+            short = floor - offer.price
+            return ConstraintResult(
+                constraint,
+                Judgement.VIOLATED,
+                f"{offer.currency} {offer.price:.2f} is {offer.currency} {short:.2f} short of "
+                f"the {offer.currency} {floor:.2f} required.",
+            )
+        return ConstraintResult(
+            constraint,
+            Judgement.SATISFIED,
+            f"{offer.currency} {offer.price:.2f} meets the {offer.currency} {floor:.2f} "
+            "required.",
         )
 
     if kind is ConstraintKind.DEADLINE:

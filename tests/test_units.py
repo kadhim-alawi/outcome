@@ -72,6 +72,57 @@ class Constraints(unittest.TestCase):
         self.assertEqual(len(every), 1)
 
 
+MINIMUM = Constraint(
+    kind=ConstraintKind.MINIMUM, description="at least 62.50", value=62.5, hard=True
+)
+
+
+class ValueFloor(unittest.TestCase):
+    """A `minimum` reverses the comparison a `budget` makes: recovering a refund
+    and buying a replacement are the same shape pointed the other way."""
+
+    def test_an_offer_below_the_floor_is_a_blocking_violation(self):
+        result = evaluate(Offer(summary="goodwill", org_id="o", price=40.0), [MINIMUM])
+        self.assertFalse(result.acceptable)
+        self.assertIn("short of", result.results[0].detail)
+
+    def test_meeting_the_floor_exactly_satisfies_it(self):
+        result = evaluate(Offer(summary="full", org_id="o", price=62.5), [MINIMUM])
+        self.assertTrue(result.acceptable)
+
+    def test_a_missing_amount_is_unknown_not_generous(self):
+        result = evaluate(Offer(summary="x", org_id="o", price=None), [MINIMUM])
+        self.assertIs(result.results[0].judgement, Judgement.UNKNOWN)
+
+    def test_larger_wins_when_only_a_floor_is_set(self):
+        offers = [
+            Offer(summary="a", org_id="o1", price=62.5),
+            Offer(summary="b", org_id="o2", price=80.0),
+        ]
+        best, _ = best_acceptable(offers, [MINIMUM])
+        self.assertEqual(best.offer.price, 80.0)
+
+    def test_cheaper_wins_when_a_ceiling_is_also_set(self):
+        band = [MINIMUM, Constraint(kind=ConstraintKind.BUDGET, description="cap", value=100)]
+        offers = [
+            Offer(summary="a", org_id="o1", price=70.0),
+            Offer(summary="b", org_id="o2", price=95.0),
+        ]
+        best, _ = best_acceptable(offers, band)
+        self.assertEqual(best.offer.price, 70.0)
+
+    def test_an_unquoted_amount_sorts_last_in_either_direction(self):
+        offers = [
+            Offer(summary="unquoted", org_id="o1", price=None),
+            Offer(summary="quoted", org_id="o2", price=62.5),
+        ]
+        for constraints in ([MINIMUM], [Constraint(
+            kind=ConstraintKind.BUDGET, description="cap", value=100
+        )]):
+            best, _ = best_acceptable(offers, constraints)
+            self.assertEqual(best.offer.price, 62.5)
+
+
 class EvidenceParsing(unittest.TestCase):
     def test_money_is_read_from_the_shapes_a_caller_produces(self):
         self.assertEqual(

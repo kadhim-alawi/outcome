@@ -197,8 +197,11 @@ class FrontierPlanner:
         the situation first.
         """
         goal = outcome.goal.rstrip(".")
-        money = next(
+        ceiling = next(
             (c for c in outcome.constraints if c.kind is ConstraintKind.BUDGET), None
+        )
+        floor = next(
+            (c for c in outcome.constraints if c.kind is ConstraintKind.MINIMUM), None
         )
         deadline = next(
             (c for c in outcome.constraints if c.kind is ConstraintKind.DEADLINE), None
@@ -206,8 +209,13 @@ class FrontierPlanner:
         bounds = []
         if deadline and deadline.value:
             bounds.append(f"by {deadline.value}")
-        if money and money.value is not None:
-            bounds.append(f"for no more than {money.value}")
+        if ceiling and ceiling.value is not None:
+            bounds.append(f"for no more than {ceiling.value}")
+        # The floor has to reach the caller too. A caller that does not know the
+        # customer needs at least 62.50 back will hear "we can do 40" as good news
+        # and stop pushing.
+        if floor and floor.value is not None:
+            bounds.append(f"for at least {floor.value}")
         bound_text = (" " + " and ".join(bounds)) if bounds else ""
         if org.discovered_by:
             return (
