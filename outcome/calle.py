@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -39,6 +40,7 @@ GET_CALL_PATH = "/v1/calls/{call_id}"
 ALLOWED_HOSTS = frozenset({"api.heycall-e.com", "api.staging.heycall-e.com"})
 
 TERMINAL_STATUSES = frozenset({"completed", "failed", "canceled", "cancelled"})
+E164 = re.compile(r"^\+[1-9]\d{6,14}$")
 POLL_INTERVAL_SECONDS = 5.0
 POLL_TIMEOUT_SECONDS = 900.0
 
@@ -164,6 +166,13 @@ class CallOutcome:
 
 
 class CalleTransport(Protocol):
+    # Whether `place` actually rings a phone. The engine keys its real-world
+    # guards off this: a calling window protects the person being called, so it
+    # applies to a live client and not to a replay. Enforcing it on the mock
+    # would make the demo unrunnable at weekends and the tests dependent on the
+    # day they are run, without protecting anybody.
+    places_real_calls: bool
+
     def place(self, request: CallRequest) -> CallOutcome: ...
 
 
@@ -188,8 +197,29 @@ def assert_trusted_base_url(base_url: str) -> str:
     return base_url.rstrip("/")
 
 
+def parse_allowed_numbers(raw: str | None) -> frozenset[str]:
+    """Read CALLE_ALLOWED_NUMBERS: a comma-separated E.164 allowlist."""
+    if not raw or not raw.strip():
+        return frozenset()
+    numbers = set()
+    for chunk in raw.replace(";", ",").split(","):
+        number = chunk.strip().replace(" ", "").replace("-", "")
+        if not number:
+            continue
+        if not E164.match(number):
+            raise CalleError(
+                f"CALLE_ALLOWED_NUMBERS contains {chunk.strip()!r}, which is not E.164. "
+                "An allowlist entry that cannot match is an allowlist entry that "
+                "silently blocks the number you meant to permit."
+            )
+        numbers.add(number)
+    return frozenset(numbers)
+
+
 class CalleClient:
     """Places real calls. Every instantiation of this class costs credits."""
+
+    places_real_calls = True
 
     def __init__(
         self,
@@ -197,6 +227,7 @@ class CalleClient:
         base_url: str = DEFAULT_BASE_URL,
         poll_interval: float = POLL_INTERVAL_SECONDS,
         poll_timeout: float = POLL_TIMEOUT_SECONDS,
+        allowed_numbers: frozenset[str] | None = None,
     ) -> None:
         if not api_key:
             raise CalleError(
@@ -207,6 +238,12 @@ class CalleClient:
         self.base_url = assert_trusted_base_url(base_url)
         self.poll_interval = poll_interval
         self.poll_timeout = poll_timeout
+        # The last line before the network. Enforced here rather than in the
+        # planner so that no planning bug, bad referral, or hand-edited phone
+        # book can reach a number the operator did not sanction. An empty
+        # allowlist means unrestricted, which is why the CLI makes the operator
+        # opt out of it explicitly rather than by leaving a variable unset.
+        self.allowed_numbers = allowed_numbers or frozenset()
 
     def _request(
         self,
@@ -241,7 +278,26 @@ class CalleClient:
     def get_call(self, call_id: str) -> dict[str, Any]:
         return self._request("GET", GET_CALL_PATH.format(call_id=call_id))
 
+    def assert_dialable(self, phone: str) -> None:
+        if not E164.match(phone):
+            raise CalleError(f"{phone!r} is not an E.164 number; refusing to dial it.")
+        if self.allowed_numbers and phone not in self.allowed_numbers:
+            raise CalleError(
+                f"{phone} is not in CALLE_ALLOWED_NUMBERS. Refusing to dial it. "
+                "Add it to the allowlist if you meant to call it."
+            )
+
+    def ping(self) -> dict[str, Any]:
+        """Verify the credential without spending a call.
+
+        `GET /v1/goals` is read-only and is the documented way to check
+        authentication against CALL-E. Reaching for `POST /v1/calls` to find out
+        whether a key works costs a phone call and somebody's afternoon.
+        """
+        return self._request("GET", "/v1/goals?limit=1")
+
     def place(self, request: CallRequest) -> CallOutcome:
+        self.assert_dialable(request.phone)
         created = self.create_call(request)
         call_id = str(created.get("id") or "")
         if not call_id:
@@ -289,6 +345,8 @@ class DryRunCalleClient:
     reads the exact task text the caller will speak before any credit is spent.
     """
 
+    places_real_calls = False
+
     def __init__(self) -> None:
         self.requests: list[CallRequest] = []
 
@@ -322,6 +380,8 @@ class MockCalleClient:
     time, and on the second attempt they pick up" without the engine knowing it
     is being played to.
     """
+
+    places_real_calls = False
 
     def __init__(self, scenario: dict[str, Any]) -> None:
         self.scenario = scenario

@@ -60,13 +60,24 @@ class Planner(Protocol):
     def next_action(self, outcome: Outcome) -> Action: ...
 
 
+def tidy_number(value: object) -> str:
+    """500, not 500.0.
+
+    This text is read out loud. A caller given "no more than 500.0" says
+    "five hundred point zero" to somebody at a trade counter.
+    """
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
 def describe_constraints(constraints: list[Constraint]) -> str:
     if not constraints:
         return "No constraints were set."
     lines = []
     for c in constraints:
         marker = "must" if c.hard else "prefer"
-        detail = f" ({c.value})" if c.value not in (None, "") else ""
+        detail = f" ({tidy_number(c.value)})" if c.value not in (None, "") else ""
         lines.append(f"- {marker}: {c.description}{detail}")
     return "\n".join(lines)
 
@@ -210,12 +221,12 @@ class FrontierPlanner:
         if deadline and deadline.value:
             bounds.append(f"by {deadline.value}")
         if ceiling and ceiling.value is not None:
-            bounds.append(f"for no more than {ceiling.value}")
+            bounds.append(f"for no more than {tidy_number(ceiling.value)}")
         # The floor has to reach the caller too. A caller that does not know the
         # customer needs at least 62.50 back will hear "we can do 40" as good news
         # and stop pushing.
         if floor and floor.value is not None:
-            bounds.append(f"for at least {floor.value}")
+            bounds.append(f"for at least {tidy_number(floor.value)}")
         bound_text = (" " + " and ".join(bounds)) if bounds else ""
         if org.discovered_by:
             return (

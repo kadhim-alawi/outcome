@@ -13,6 +13,7 @@ from typing import Any
 
 from .interpret import default_interpreter
 from .models import Budget, Constraint, ConstraintKind, Organization, Outcome, is_e164
+from .window import CallWindow, WindowError
 
 # A ceiling on the ceiling. The form is user input, and "call up to 500 people"
 # should not be one keystroke away from "call up to 5".
@@ -119,11 +120,16 @@ def outcome_from_definition(definition: dict[str, Any]) -> Outcome:
     goal = str(definition.get("goal") or "").strip()
     if not goal:
         raise DefinitionError("An outcome needs a goal.")
+    try:
+        window = CallWindow.from_dict(definition.get("call_window"))
+    except WindowError as exc:
+        raise DefinitionError(str(exc)) from None
     return Outcome(
         goal=goal,
         constraints=_constraints(definition.get("constraints")),
         organizations=_organizations(definition.get("organizations")),
         budget=_budget(definition.get("budget")),
+        call_window=window,
     )
 
 

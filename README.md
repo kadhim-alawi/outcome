@@ -70,28 +70,82 @@ call unless you ask for `--live`.
 python3 -m outcome.cli run scenarios/supplier-replacement.json     # terminal
 python3 -m outcome.cli run scenarios/bill-dispute.json             # a different shape
 python3 -m outcome.server                                          # http://127.0.0.1:8765
-python3 -m unittest discover -s tests                              # 51 tests
+python3 -m unittest discover -s tests                              # 85 tests
 ```
 
 The CLI stops at the approval gate and asks. `--approve auto` answers yes,
 `--approve never` answers no — the run then goes back out to look for something
 else, which is worth watching once.
 
-### Placing real calls
+### Before your first live call
+
+Four guards stand between the planner and somebody's ringing phone. Work
+through them in order; none of the first three costs a credit.
+
+**1. Read the script.** `--dry-run` renders the exact CALL-E request, including
+the words the caller will speak, and places nothing.
 
 ```bash
-export CALLE_API_KEY=...            # from dashboard.heycall-e.com/account/api-keys
-python3 -m outcome.cli run scenarios/supplier-replacement.json --dry-run   # see the script first
-python3 -m outcome.cli run scenarios/supplier-replacement.json --live      # spends credits
+python3 -m outcome.cli run scenarios/supplier-replacement.json --dry-run
 ```
 
-`--dry-run` renders the exact CALL-E request — including the words the caller
-will speak — and places nothing. Run it before `--live`, every time. The
-credential is read from the environment, never written to disk, and only ever
-sent to `api.heycall-e.com` (see `ALLOWED_HOSTS` in `outcome/calle.py`).
+**2. Preflight.** Verifies the credential with a read-only `GET /v1/goals`,
+checks every number against the allowlist, reports whether the calling window
+is open, and prints the first call's script in full.
 
+```bash
+export CALLE_API_KEY=...                            # dashboard.heycall-e.com/account/api-keys
+export CALLE_ALLOWED_NUMBERS="+447700900123"        # your own number, to begin with
+python3 -m outcome.cli preflight scenarios/supplier-replacement.json
+```
+
+**3. The allowlist.** Enforced inside `CalleClient.place`, not beside it — a
+number the agent was handed mid-call reaches the dialler without passing
+through any form, so the check has to sit on the last line before the network.
+`--live` refuses to start without one unless you pass `--allow-any-number`.
+
+**4. The calling window.** Per-outcome, in the recipients' own timezone. A run
+started outside it **parks** rather than failing, and resumes at the same call
+when the window opens. `--live` refuses to start on an outcome that has none.
+
+```json
+"call_window": {"timezone": "Europe/London", "start": "09:00",
+                "end": "17:30", "weekdays": [0, 1, 2, 3, 4]}
+```
+
+Then, with a store so a crash cannot cost you a second call to the same person:
+
+```bash
+python3 -m outcome.cli run scenarios/supplier-replacement.json --live --store runs.sqlite3
+```
+
+The credential is read from the environment, never written to disk, and only
+ever sent to `api.heycall-e.com` (see `ALLOWED_HOSTS` in `outcome/calle.py`).
 Phone numbers in this repository are all in the `+1-555-01xx` range reserved
 for fiction.
+
+### If it crashes mid-call
+
+The ledger is written **before** the dial, not after, because the window that
+matters is the one where the phone is ringing and nothing has been recorded yet.
+
+```bash
+python3 -m outcome.cli calls --store runs.sqlite3
+```
+
+An unfinished entry means a call was started and never recorded a result, so it
+may have connected. The engine refuses to dial that number again until you say
+which happened:
+
+- `--resolve KEY` — it happened. Recorded as `blocked`, not `no_answer`:
+  `no_answer` is retryable, and re-ringing somebody who may have just spent five
+  minutes with the agent is the wrong move. The credit is spent, the frontier
+  advances, nobody is called twice for one crash.
+- `--forget KEY` — it never happened. Clears the claim so the number can be
+  dialled. Only correct if you actually established that.
+
+A restart with a completed ledger entry replays the stored result and dials
+nothing.
 
 ## The second scenario
 
@@ -139,6 +193,11 @@ after, so an approval that sat overnight cannot spend a credit the budget no
 longer has. A CALL-E hackathon account holds 20 calls; the default budget is 6
 per outcome and 2 per organisation.
 
+**It waits rather than ringing at 03:00.** The calling window is the failure an
+autonomous agent falls into most easily, because nothing in the loop knows what
+time it is where the phone is. A closed window parks the run — including an
+approval already given, which is kept rather than re-asked.
+
 **Which direction is "better" comes from the constraints.** A `budget` makes
 cheaper better; a `minimum` makes larger better. Buying a replacement and
 recovering a refund are the same machinery pointed the other way — which is
@@ -153,10 +212,12 @@ outcome/
   evidence.py     structured_result -> Evidence, defensively
   planner.py      frontier search + the call scripts
   approval.py     what needs a human, and the negation-aware safety net
+  window.py       when it is acceptable to dial, in the recipients' timezone
   engine.py       the loop
-  calle.py        CALL-E v0.6.0 adapter: live, dry-run, mock
+  calle.py        CALL-E v0.6.0 adapter: live, dry-run, mock, number allowlist
+  store.py        SQLite, and the write-ahead call ledger
   interpret.py    one sentence -> goal + constraints (rules, or an LLM)
-  cli.py          watch a run in a terminal
+  cli.py          run, preflight, calls
   server.py       watch a run in a browser
 scenarios/        scripted runs for the mock transport
 web/index.html    the form and the timeline UI

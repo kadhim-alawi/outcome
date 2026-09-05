@@ -23,6 +23,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from .window import CallWindow
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -331,6 +333,9 @@ class OutcomeStatus(str, Enum):
     WORKING = "working"
     AWAITING_APPROVAL = "awaiting_approval"
     AWAITING_USER = "awaiting_user"
+    # Not terminal: the run is paused until the recipients' working day starts.
+    # Calling `run()` again after that resumes it exactly where it stopped.
+    AWAITING_WINDOW = "awaiting_window"
     RESOLVED = "resolved"
     FAILED = "failed"
     ABANDONED = "abandoned"
@@ -376,6 +381,7 @@ class Outcome:
     actions: list[Action] = field(default_factory=list)
     evidence: list[Evidence] = field(default_factory=list)
     budget: Budget = field(default_factory=Budget)
+    call_window: CallWindow | None = None
     declined_offer_ids: list[str] = field(default_factory=list)
     status: OutcomeStatus = OutcomeStatus.DRAFT
     resolution: dict[str, Any] | None = None
@@ -462,6 +468,7 @@ class Outcome:
             "actions": [a.to_dict() for a in self.actions],
             "evidence": [e.to_dict() for e in self.evidence],
             "budget": self.budget.to_dict(),
+            "call_window": self.call_window.to_dict() if self.call_window else None,
             "declined_offer_ids": list(self.declined_offer_ids),
             "resolution": self.resolution,
             "pending_approval_action_id": self.pending_approval_action_id,
@@ -478,6 +485,7 @@ class Outcome:
             actions=[Action.from_dict(a) for a in d.get("actions") or []],
             evidence=[Evidence.from_dict(e) for e in d.get("evidence") or []],
             budget=Budget.from_dict(d.get("budget") or {}),
+            call_window=CallWindow.from_dict(d.get("call_window")),
             declined_offer_ids=list(d.get("declined_offer_ids") or []),
             status=OutcomeStatus(d.get("status", "draft")),
             resolution=d.get("resolution"),

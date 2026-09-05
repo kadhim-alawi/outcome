@@ -173,7 +173,7 @@ quoted*, which reads as unknown — never as free, and never as generous.
 is decided by the constraints, so an outcome that recovers a refund and one that
 buys a replacement are the same shape with the comparison reversed.
 
-### SQLite schema (specified, **not built**)
+### SQLite schema (`outcome/store.py`)
 
 ```sql
 CREATE TABLE outcomes (
@@ -194,8 +194,33 @@ CREATE TABLE calls (                            -- credit ledger, one row per di
 ```
 
 The document column holds the whole outcome because it is read and written as a
-unit. `events` is separate because the UI replays it. `calls` exists so the
-budget survives a restart: a process that forgets what it dialled will dial again.
+unit. `events` is separate because the UI replays it.
+
+`calls` is the one that matters, and it is written **before** the dial, not
+after. A process that forgets what it dialled will dial again, and the person on
+the other end has no way to know the second call is a bug. Recording it
+afterwards leaves exactly the window that matters uncovered: the crash that
+happens while the phone is ringing.
+
+The sequence is claim, dial, complete, and each state means something specific
+on restart:
+
+| Ledger row | Meaning | What the engine does |
+|---|---|---|
+| absent | never dialled | dial |
+| claimed, no result | started, outcome unknown | **refuse to dial**; park on `AWAITING_USER` |
+| claimed + result | finished | replay the stored result; dial nothing |
+
+A parked action stays `RUNNING`, not `FAILED`. `FAILED` is not resumable, so
+marking it failed would make the operator's `--resolve` a no-op and throw away a
+call that was already paid for.
+
+Clearing an unresolved entry is a human decision with two answers, and
+`outcome calls` names both. `--resolve` records it as `blocked`, deliberately
+not `no_answer`: `no_answer` is retryable, and re-ringing somebody who may have
+just spent five minutes with the agent is the wrong move. `--forget` deletes the
+claim so the number can be dialled, and is only correct when the operator has
+established that no call was placed.
 
 ---
 
@@ -208,13 +233,17 @@ budget survives a restart: a process that forgets what it dialled will dial agai
                          │ run()
                          ▼
    ┌───────────────► WORKING ◄──────────────┐
-   │                 │  │  │                │
-   │      approve()  │  │  │  reject()      │
-   │                 │  │  └────────────────┘
-   │                 │  │
-   │                 │  └──────────► AWAITING_USER   (an action the engine
-   │                 │                                cannot execute alone)
-   │                 ▼
+   │                 │ │ │ │                │
+   │      approve()  │ │ │ │  reject()      │
+   │                 │ │ │ └────────────────┘
+   │                 │ │ │
+   │                 │ │ └──► AWAITING_WINDOW  (the recipients' working day
+   │                 │ │      ▲   │             has not started; run() resumes)
+   │                 │ │      └───┘
+   │                 │ │
+   │                 │ └────► AWAITING_USER    (an action the engine cannot
+   │                 │                          execute alone, or a call whose
+   │                 ▼                          outcome is unknown)
    └──────── AWAITING_APPROVAL
                      │
       ┌──────────────┼──────────────┐
@@ -223,7 +252,8 @@ budget survives a restart: a process that forgets what it dialled will dial agai
 ```
 
 `RESOLVED` · `ABANDONED` · `FAILED` are terminal; `resolution` is written once
-on entry and never revised.
+on entry and never revised. `AWAITING_WINDOW` and `AWAITING_USER` are **not**
+terminal — the run is a value, parked, and `run()` picks it up where it stopped.
 
 `run()` is re-entrant. Calling it while parked on approval must place no call —
 that is `ApprovalGate::test_no_call_is_placed_while_waiting_for_approval`.
@@ -331,6 +361,41 @@ A hackathon account starts with 20 calls. Defaults: `max_calls=6` per outcome,
 not when planning, so an approval that sat overnight cannot spend a credit the
 budget no longer has.
 
+### 7.3 The number allowlist
+
+`CALLE_ALLOWED_NUMBERS`, enforced inside `CalleClient.place` rather than beside
+it. The frontier grows from numbers given on calls, so a referral reaches the
+dialler without passing through any form the operator filled in — the check has
+to sit on the last line before the network, where no planning bug, bad referral
+or hand-edited phone book can get past it. An entry that is not E.164 is an
+error rather than a silent drop: an allowlist entry that cannot match is one
+that silently blocks the number you meant to permit.
+
+`--live` refuses to start without an allowlist unless `--allow-any-number` is
+passed explicitly. For a first live run, put only your own number in it.
+
+### 7.4 The calling window
+
+`outcome/window.py`. Hours, days and an IANA timezone — the **recipients'**
+timezone, not the operator's. Calling a depot at 03:00 is legal and awful, and
+it is the failure an autonomous agent falls into most easily, because nothing in
+the loop knows what time it is where the phone is.
+
+Checked immediately before every dial. A closed window **parks** the run on
+`AWAITING_WINDOW` rather than failing it, and the action stays `PLANNED` so the
+next `run()` resumes that exact call — including an approval already given,
+which is kept rather than re-asked. `next_open` walks forward a day at a time
+rather than doing arithmetic on an offset, because the answer has to survive a
+DST transition.
+
+The guard keys off `transport.places_real_calls`, so it applies to the live
+client and not to a replay. Enforcing a Mon–Fri window on the mock would make
+the demo unrunnable at weekends and the test suite dependent on the day it runs,
+while protecting nobody. Unknown transports default to enforcing: a guard that
+fails open is not a guard.
+
+`--live` refuses to start on an outcome with no window.
+
 ---
 
 ## 8. Call scripts
@@ -426,6 +491,10 @@ immediately re-propose it. Without that, "no" is a loop.
 | Referral with no dialable number | Dropped |
 | Polling timeout | Raise. Never re-`POST` — that is a second phone ringing |
 | Call budget reached | `ABANDON` with the full report. Never "one more try" |
+| Outside the calling window | Park on `AWAITING_WINDOW`. Resume the same call, with its approval, when it opens |
+| Number not on the allowlist | Refuse at the transport. In `--live`, caught before the run starts |
+| Crash mid-call | The ledger claim survives without a result. Refuse to re-dial; a human says which happened |
+| Restart after a completed call | Replay the stored result. Dial nothing |
 | Every lead exhausted | `ABANDON` with every fact, blocker and rejected offer |
 
 There is no silent failure mode. Both terminal states write a `resolution`
@@ -447,6 +516,9 @@ considered with the reason it lost.
 | `POST` | `/api/runs` | `{scenario, outcome?}` | `{outcome, events, event_count, live}` |
 | `GET` | `/api/runs/{id}` | | same snapshot |
 | `POST` | `/api/decide` | `{run_id, approve, reason?}` | snapshot of **events since the decision** |
+
+The server is mock-backed and has no store; the CLI is the surface that carries
+`--store`, `preflight` and `calls`.
 
 A run advances to completion or to the approval gate inside one request; the
 page animates the returned event list. Streaming would look identical on screen
@@ -474,13 +546,17 @@ anything, so it is an error rather than a warning.
 ## 13. Repository structure
 
 ```
-outcome/{models,constraints,evidence,planner,approval,engine,calle,interpret,loader,cli,server}.py
+outcome/{models,constraints,evidence,planner,approval,window,engine,calle,store,
+         interpret,loader,cli,server}.py
 scenarios/*.json         outcome definition + scripted responses for the mock
 web/index.html           the form and the timeline UI
 contrib/skills/          the outcome-completion-agent package for the upstream PR
-tests/                   51 tests, stdlib unittest, no network
+tests/                   85 tests, stdlib unittest, no network
 docs/                    this file, the landscape teardown, the demo script
 ```
+
+CLI surface: `run` (with `--dry-run` / `--live` / `--store`), `preflight`
+(checks a live run without placing one), `calls` (the ledger, after a crash).
 
 ---
 
@@ -494,21 +570,25 @@ Honest list, in the order it should be closed.
    call to a number we control, then the full scenario. Budget 6 of the 20
    free credits for this and request the additional 200 now — the form takes
    one to five business days.
-2. **SQLite.** Schema in §4. Needed before any run outlives a process — in
-   particular the `calls` ledger, without which a restart re-dials.
-3. **Server has no auth.** Localhost only until it does.
-4. **`ASK_USER` parks the run and nothing resumes it.** The planner never emits
-   one today; the moment it does, the UI needs the matching input.
-5. **`LLMInterpreter` is untested against the live API.** It falls back to rules
+2. **Server has no auth, and no store.** Localhost only. The browser demo does
+   not persist runs; the CLI does.
+3. **`ASK_USER` parks the run and nothing in the UI resumes it.** The engine
+   reaches it after an unresolved call; the CLI's `calls` command is the way
+   out, and the browser has no equivalent.
+4. **`LLMInterpreter` is untested against the live API.** It falls back to rules
    on any failure, so a break degrades the parse rather than the run — but the
    success path has only been exercised offline.
-6. **No time-of-day window.** See §16; this should land before any live run
-   against a business.
+5. **One window per outcome, not per organisation.** Per-organisation is right
+   the first time a run spans two continents. Until then one window keeps the
+   model honest, and a single wrong timezone is easier to spot than five.
 
 Closed since the first draft: the form is editable and takes a phone book (§3.1);
 a second scenario of a different shape runs on the same engine (`bill-dispute`,
 which added the `minimum` constraint kind and nothing else); the upstream skill
-package is written and passes that repository's validator (§15).
+package is written and passes that repository's validator (§15); SQLite and the
+write-ahead call ledger (§4); the number allowlist (§7.3); the calling window
+(§7.4); and `preflight`, which checks everything checkable about a live run
+without placing one.
 
 ---
 
@@ -567,9 +647,6 @@ than another entry in it.
 
 ## 16. Open questions
 
-- **Time-of-day windows.** Calling a depot at 03:00 is legal and awful. `concord`
-  in the reference repo gates calls on the recipient's local opening hours; this
-  should too, before any live run against a business.
 - **Recording and disclosure by jurisdiction.** Disclosure is in every script,
   but the wording is not jurisdiction-aware.
 - **Where a soft constraint should stop being soft.** Three soft violations on

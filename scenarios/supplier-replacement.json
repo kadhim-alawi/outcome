@@ -10,6 +10,18 @@
       "max_calls_per_org": 2,
       "max_actions": 20
     },
+    "call_window": {
+      "timezone": "Europe/London",
+      "start": "09:00",
+      "end": "17:30",
+      "weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
     "constraints": [
       {
         "kind": "budget",

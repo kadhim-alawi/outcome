@@ -17,10 +17,10 @@ Two properties matter more than the loop itself:
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from . import approval as approval_mod
-from .calle import CalleTransport, CallRequest
+from .calle import CalleError, CalleTransport, CallOutcome, CallRequest
 from .constraints import best_acceptable, evaluate
 from .evidence import extract
 from .models import (
@@ -36,6 +36,9 @@ from .models import (
     utc_now,
 )
 from .planner import FrontierPlanner, Planner
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle: store imports calle types
+    from .store import Store
 
 EventSink = Callable[[dict[str, Any]], None]
 
@@ -57,10 +60,15 @@ class Engine:
         transport: CalleTransport,
         planner: Planner | None = None,
         on_event: EventSink | None = None,
+        store: "Store | None" = None,
     ) -> None:
         self.transport = transport
         self.planner = planner or FrontierPlanner()
         self.on_event = on_event or (lambda event: None)
+        # Optional. Without it the engine is a pure value-transformer and a
+        # crash loses the run; with it, every event is durable and no number is
+        # dialled twice across a restart.
+        self.store = store
 
     # -- public API ------------------------------------------------------
 
@@ -73,6 +81,8 @@ class Engine:
         if outcome.status is OutcomeStatus.DRAFT:
             outcome.status = OutcomeStatus.WORKING
             self._emit(outcome, "started", {"goal": outcome.goal})
+        elif outcome.status is OutcomeStatus.AWAITING_WINDOW:
+            outcome.status = OutcomeStatus.WORKING
 
         while not outcome.is_terminal():
             action = self._next_action(outcome)
@@ -141,6 +151,28 @@ class Engine:
             pending.status = ActionStatus.PLANNED
             outcome.pending_approval_action_id = None
             return pending
+        # Two states mean "this action was chosen and never finished":
+        #
+        #   PLANNED - parked before dialling, because the calling window shut.
+        #   RUNNING - interrupted during the dial. Only ever seen after a crash,
+        #             because nothing else leaves an action in it.
+        #
+        # Both resume the same action rather than planning a fresh one.
+        # Re-planning would append a duplicate; for an approved commit action it
+        # would throw away the approval and ask the user again; and for a RUNNING
+        # action it would mint a new action id, which changes the idempotency key
+        # and walks straight past the ledger entry for the call that may already
+        # have happened.
+        resumable = next(
+            (
+                a
+                for a in outcome.actions
+                if a.status in (ActionStatus.PLANNED, ActionStatus.RUNNING)
+            ),
+            None,
+        )
+        if resumable is not None:
+            return resumable
         action = self.planner.next_action(outcome)
         outcome.actions.append(action)
         outcome.updated_at = utc_now()
@@ -188,6 +220,27 @@ class Engine:
             )
             return False
 
+        # Unknown transports default to enforcing: a guard that fails open is
+        # not a guard.
+        dials = getattr(self.transport, "places_real_calls", True)
+        window = outcome.call_window
+        if dials and window is not None and not window.is_open():
+            # Parked, not abandoned. The action stays PLANNED so the next run()
+            # picks up this one, with its approval if it had one.
+            outcome.status = OutcomeStatus.AWAITING_WINDOW
+            self._emit(
+                outcome,
+                "awaiting_window",
+                {
+                    "action_id": action.id,
+                    "org": org.name,
+                    "detail": window.explain_closed(),
+                    "window": window.describe(),
+                    "opens_at": window.next_open().isoformat(timespec="minutes"),
+                },
+            )
+            return False
+
         action.status = ActionStatus.RUNNING
         self._emit(
             outcome,
@@ -213,7 +266,9 @@ class Engine:
                 "objective": action.purpose[:200],
             },
         )
-        call = self.transport.place(request)
+        call = self._place(outcome, action, request)
+        if call is None:
+            return False
         evidence = extract(action, call)
         action.status = ActionStatus.DONE if call.succeeded else ActionStatus.FAILED
         outcome.record(evidence)
@@ -223,6 +278,90 @@ class Engine:
         self._emit(outcome, "evidence", self._evidence_event(outcome, action, evidence))
         self._absorb_referrals(outcome, evidence)
         return True
+
+    def _place(
+        self, outcome: Outcome, action: Action, request: CallRequest
+    ) -> CallOutcome | None:
+        """Dial, consulting the ledger first. Returns None if the run parked.
+
+        Without a store this is just `transport.place`. With one, the sequence is
+        claim, dial, complete — in that order, because a crash while the phone is
+        ringing has to leave evidence that it might have rung.
+        """
+        if self.store is None:
+            return self.transport.place(request)
+
+        key = request.idempotency_key()
+        prior = self.store.find_call(key)
+        if prior is None:
+            # Validate before claiming. A refusal here (bad number, not on the
+            # allowlist) means nothing was dialled, and a claim left behind for
+            # it would block this action forever.
+            check = getattr(self.transport, "assert_dialable", None)
+            if check is not None:
+                check(request.phone)
+            if not self.store.claim_call(key, outcome.id, action.id, request.phone):
+                prior = self.store.find_call(key)  # lost a race; fall through
+
+        if prior is not None:
+            if prior.finished:
+                self._emit(
+                    outcome,
+                    "replayed",
+                    {
+                        "action_id": action.id,
+                        "call_id": prior.call_id,
+                        "detail": "This call was already placed. Replaying its stored "
+                        "result rather than dialling again.",
+                    },
+                )
+                return prior.replay()
+            # The action stays RUNNING. It has not failed — it is unresolved,
+            # and the difference decides whether clearing the ledger entry can
+            # ever help: a FAILED action is not resumable, so the operator's
+            # `--resolve` would land on a run that has already moved past it and
+            # the paid-for call would be thrown away.
+            outcome.status = OutcomeStatus.AWAITING_USER
+            self._emit(
+                outcome,
+                "unresolved_call",
+                {
+                    "action_id": action.id,
+                    "claimed_at": prior.claimed_at,
+                    "phone": mask_phone(prior.phone),
+                    "detail": (
+                        "A call to this number was started and never recorded a result, "
+                        "so it may have connected. Refusing to dial again. Check whether "
+                        "it happened, then clear it with: outcome calls --resolve "
+                        f"{prior.idempotency_key}"
+                    ),
+                },
+            )
+            return None
+
+        try:
+            call = self.transport.place(request)
+        except CalleError:
+            # The claim stays, and so does RUNNING. We do not know whether the
+            # phone rang, and the safe reading of "do not know" is "assume it
+            # did" — but the action must stay resumable so that clearing the
+            # ledger entry can put the run back on its feet.
+            outcome.status = OutcomeStatus.AWAITING_USER
+            self._emit(
+                outcome,
+                "unresolved_call",
+                {
+                    "action_id": action.id,
+                    "phone": mask_phone(request.phone),
+                    "detail": (
+                        "The call failed in a way that does not say whether it "
+                        "connected. Refusing to retry it automatically."
+                    ),
+                },
+            )
+            return None
+        self.store.complete_call(key, call)
+        return call
 
     def _park_for_approval(
         self, outcome: Outcome, action: Action, org: Organization, reason: str
@@ -378,4 +517,10 @@ class Engine:
         return report
 
     def _emit(self, outcome: Outcome, kind: str, data: dict[str, Any]) -> None:
-        self.on_event({"at": utc_now(), "outcome_id": outcome.id, "kind": kind, **data})
+        event = {"at": utc_now(), "outcome_id": outcome.id, "kind": kind, **data}
+        if self.store is not None:
+            # Persist before handing the event out, so what a caller has seen is
+            # never more than what survived a crash.
+            self.store.append_events(outcome.id, [event])
+            self.store.save(outcome)
+        self.on_event(event)

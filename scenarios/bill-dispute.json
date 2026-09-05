@@ -4,14 +4,49 @@
   "description": "A sole trader's September mobile bill is $87.32 higher than usual with no explanation. Part of it turns out to be legitimate; part is a duplicated add-on. Getting the incorrect part credited means climbing an escalation chain inside one company, because the first two people reached cannot authorise a credit that size. Every phone number is in the +1-555-01xx range reserved for fiction, and no call is placed: this scenario drives the mock transport.",
   "outcome": {
     "goal": "Find out why the September mobile bill on account 4471-88 is USD 87.32 higher than usual, and get any incorrect charge credited back.",
-    "budget": {"max_calls": 6, "max_calls_per_org": 2, "max_actions": 20},
+    "budget": {
+      "max_calls": 6,
+      "max_calls_per_org": 2,
+      "max_actions": 20
+    },
+    "call_window": {
+      "timezone": "Europe/London",
+      "start": "09:00",
+      "end": "17:30",
+      "weekdays": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
     "constraints": [
-      {"kind": "minimum", "description": "At least the USD 62.50 identified as incorrect, credited back", "value": 62.5, "hard": true},
-      {"kind": "deadline", "description": "Credit applied on or before 12 September", "value": "2026-09-12", "hard": true},
-      {"kind": "required_fact", "description": "A credit reference number", "value": "reference", "hard": false}
+      {
+        "kind": "minimum",
+        "description": "At least the USD 62.50 identified as incorrect, credited back",
+        "value": 62.5,
+        "hard": true
+      },
+      {
+        "kind": "deadline",
+        "description": "Credit applied on or before 12 September",
+        "value": "2026-09-12",
+        "hard": true
+      },
+      {
+        "kind": "required_fact",
+        "description": "A credit reference number",
+        "value": "reference",
+        "hard": false
+      }
     ],
     "organizations": [
-      {"name": "Meridian Mobile customer service", "phone": "+15550100011", "role": "General enquiries line on the bill"}
+      {
+        "name": "Meridian Mobile customer service",
+        "phone": "+15550100011",
+        "role": "General enquiries line on the bill"
+      }
     ]
   },
   "responses": [
@@ -28,7 +63,9 @@
           "USD 62.50 is a second 'Unlimited Data Boost' added on 1 September while one was already active.",
           "The duplicate add-on is visible in their system and was not requested."
         ],
-        "blockers": ["Customer service can only authorise credits up to USD 50."],
+        "blockers": [
+          "Customer service can only authorise credits up to USD 50."
+        ],
         "referrals": [
           {
             "org_name": "Meridian Mobile billing team",

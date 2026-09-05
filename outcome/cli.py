@@ -16,10 +16,17 @@ import os
 import sys
 from typing import Any
 
-from .calle import CalleClient, DryRunCalleClient, MockCalleClient
+from .calle import (
+    CalleClient,
+    CalleError,
+    DryRunCalleClient,
+    MockCalleClient,
+    parse_allowed_numbers,
+)
 from .engine import Engine
 from .loader import load_scenario
-from .models import Outcome, OutcomeStatus
+from .models import ActionType, Outcome, OutcomeStatus, mask_phone
+from .planner import FrontierPlanner
 
 RESET, DIM, BOLD = "\033[0m", "\033[2m", "\033[1m"
 GREEN, YELLOW, RED, BLUE, CYAN = (
@@ -143,20 +150,65 @@ class Printer:
     def _on_awaiting_user(self, e):
         return f"  {YELLOW}? waiting on you:{RESET} {e['purpose']}"
 
+    def _on_awaiting_window(self, e):
+        return (
+            f"\n{YELLOW}  PAUSED{RESET}\n  {e['detail']}\n"
+            f"  {DIM}The run is not lost. Start it again once the window is open and it "
+            f"resumes at this call.{RESET}"
+        )
+
     def _on_error(self, e):
         return f"  {RED}error:{RESET} {e['detail']}"
 
 
+def _live_client(allow_any_number: bool = False) -> CalleClient:
+    key = os.environ.get("CALLE_API_KEY", "")
+    if not key:
+        raise SystemExit(
+            "CALLE_API_KEY is not set. Refusing to start a run that would place real "
+            "calls without a credential."
+        )
+    try:
+        allowed = parse_allowed_numbers(os.environ.get("CALLE_ALLOWED_NUMBERS"))
+    except CalleError as exc:
+        raise SystemExit(str(exc)) from None
+    if not allowed and not allow_any_number:
+        raise SystemExit(
+            "CALLE_ALLOWED_NUMBERS is not set.\n\n"
+            "A live run dials whoever the agent decides to dial, including numbers it "
+            "was given on a call. Set the allowlist to the numbers you are willing to "
+            "have rung:\n\n"
+            '    export CALLE_ALLOWED_NUMBERS="+15550100001,+15550100002"\n\n'
+            "For a first live run, put only your own number in it. Pass "
+            "--allow-any-number to run without an allowlist."
+        )
+    return CalleClient(
+        api_key=key,
+        base_url=os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com"),
+        allowed_numbers=allowed,
+    )
+
+
+def _check_live_preconditions(outcome: Outcome, client: CalleClient) -> list[str]:
+    """Everything that should stop a live run before the first dial, not during it."""
+    problems: list[str] = []
+    if outcome.call_window is None:
+        problems.append(
+            "This outcome has no calling window. A live run needs one, or the agent "
+            'will dial at 03:00. Add "call_window": {"timezone": "Europe/London", '
+            '"start": "09:00", "end": "17:30", "weekdays": [0,1,2,3,4]} to the scenario.'
+        )
+    for org in outcome.organizations:
+        try:
+            client.assert_dialable(org.phone)
+        except CalleError as exc:
+            problems.append(f"{org.name}: {exc}")
+    return problems
+
+
 def _transport(args, scenario):
     if args.live:
-        key = os.environ.get("CALLE_API_KEY", "")
-        if not key:
-            raise SystemExit(
-                "--live needs CALLE_API_KEY in the environment. Refusing to start a run "
-                "that would place real calls without a credential."
-            )
-        base = os.environ.get("CALLE_BASE_URL", "https://api.heycall-e.com")
-        return CalleClient(api_key=key, base_url=base)
+        return _live_client(getattr(args, "allow_any_number", False))
     if args.dry_run:
         return DryRunCalleClient()
     return MockCalleClient(scenario)
@@ -174,6 +226,151 @@ def _prompt_approval(outcome: Outcome, mode: str) -> bool:
     return answer in ("y", "yes")
 
 
+def cmd_preflight(args: argparse.Namespace) -> int:
+    """Everything checkable about a live run, without placing one.
+
+    A first live run against real numbers should never be the moment you find
+    out the key is wrong, the window is shut, or the script says something you
+    would not say. All of that is knowable for free.
+    """
+    colour = sys.stdout.isatty() and not args.no_colour
+    out = lambda text: print(_colour(colour, text))  # noqa: E731
+    scenario, outcome = load_scenario(args.scenario)
+    problems: list[str] = []
+    warnings: list[str] = []
+
+    out(f"\n{BOLD}OUTCOME preflight{RESET}  {DIM}nothing will be dialled{RESET}\n")
+    out(f"  {BOLD}Goal{RESET}          {outcome.goal}")
+
+    try:
+        client = _live_client(args.allow_any_number)
+    except SystemExit as exc:
+        out(f"  {RED}Credential    {exc}{RESET}")
+        return 1
+
+    out(f"  {BOLD}Endpoint{RESET}      {client.base_url}")
+    try:
+        client.ping()
+        out(f"  {BOLD}Credential{RESET}    {GREEN}accepted{RESET} "
+            f"{DIM}(read-only GET /v1/goals; no call placed){RESET}")
+    except CalleError as exc:
+        out(f"  {BOLD}Credential{RESET}    {RED}rejected{RESET} — {exc}")
+        problems.append("The API key was not accepted.")
+
+    if client.allowed_numbers:
+        listed = ", ".join(sorted(mask_phone(n) for n in client.allowed_numbers))
+        out(f"  {BOLD}Allowlist{RESET}     {len(client.allowed_numbers)} number(s): {listed}")
+    else:
+        out(f"  {BOLD}Allowlist{RESET}     {YELLOW}none — any number may be dialled{RESET}")
+        warnings.append(
+            "No allowlist: the agent may dial any number it is given on a call."
+        )
+
+    window = outcome.call_window
+    if window is None:
+        out(f"  {BOLD}Window{RESET}        {RED}not set{RESET}")
+    elif window.is_open():
+        out(f"  {BOLD}Window{RESET}        {GREEN}open now{RESET} {DIM}({window.describe()}){RESET}")
+    else:
+        out(f"  {BOLD}Window{RESET}        {YELLOW}closed{RESET} — {window.explain_closed()}")
+        warnings.append(
+            f"The window is closed, so a run started now will park immediately and "
+            f"place no calls until {window.next_open().strftime('%a %d %b %H:%M %Z')}."
+        )
+
+    out(f"  {BOLD}Budget{RESET}        {outcome.budget.max_calls} calls total, "
+        f"{outcome.budget.max_calls_per_org} per organisation")
+
+    out(f"\n  {BOLD}Requirements{RESET}")
+    for c in outcome.constraints:
+        marker = "must  " if c.hard else "prefer"
+        out(f"    {DIM}{marker}{RESET} {c.description} {DIM}({c.kind.value}={c.value}){RESET}")
+
+    out(f"\n  {BOLD}Phone book{RESET}")
+    for org in outcome.organizations:
+        try:
+            client.assert_dialable(org.phone)
+            mark, note = f"{GREEN}✓{RESET}", ""
+        except CalleError as exc:
+            mark, note = f"{RED}✗{RESET}", f"  {RED}{exc}{RESET}"
+            problems.append(f"{org.name}: {exc}")
+        out(f"    {mark} {org.name} {DIM}{mask_phone(org.phone)}{RESET}{note}")
+
+    problems.extend(
+        p for p in _check_live_preconditions(outcome, client) if p not in problems
+    )
+
+    action = FrontierPlanner().next_action(outcome)
+    if action.type is ActionType.CALL:
+        out(f"\n  {BOLD}First call{RESET}  {DIM}the exact words the caller is given{RESET}")
+        out(f"  {DIM}{'─' * 66}{RESET}")
+        for line in action.task_prompt.splitlines():
+            out(f"  {line}")
+        out(f"  {DIM}{'─' * 66}{RESET}")
+
+    if problems:
+        out(f"\n{RED}{BOLD}  NOT READY{RESET}")
+        for problem in problems:
+            out(f"    {RED}✗{RESET} {problem}")
+        out("")
+        return 1
+    if warnings:
+        out(f"\n{YELLOW}{BOLD}  READY, WITH CAVEATS{RESET}")
+        for warning in warnings:
+            out(f"    {YELLOW}~{RESET} {warning}")
+        out(f"  {DIM}Nothing here blocks a live run. Read them anyway.{RESET}\n")
+        return 0
+    out(f"\n{GREEN}{BOLD}  READY{RESET}  {DIM}run again with --live to place calls.{RESET}\n")
+    return 0
+
+
+def cmd_calls(args: argparse.Namespace) -> int:
+    """The operator surface for the call ledger.
+
+    Only ever needed after a crash. An unfinished entry means a call was started
+    and never recorded a result, so the engine refuses to dial that number again
+    until somebody says which of the two things happened.
+    """
+    from .store import Store
+
+    colour = sys.stdout.isatty() and not args.no_colour
+    out = lambda text: print(_colour(colour, text))  # noqa: E731
+    store = Store(args.store)
+
+    if args.resolve:
+        if store.resolve_call(args.resolve):
+            out(f"{GREEN}Recorded as placed.{RESET} That number will not be dialled again "
+                "for this action, and the run can continue.")
+            return 0
+        out(f"{RED}No unfinished call with that key.{RESET}")
+        return 1
+
+    if args.forget:
+        if store.forget_call(args.forget):
+            out(f"{YELLOW}Claim removed.{RESET} That number can now be dialled again. "
+                "Only correct if you established the call never happened.")
+            return 0
+        out(f"{RED}No unfinished call with that key.{RESET}")
+        return 1
+
+    unfinished = store.unfinished_calls()
+    if not unfinished:
+        out(f"{GREEN}No unfinished calls.{RESET} Nothing was left mid-flight.")
+        return 0
+
+    out(f"\n{YELLOW}{BOLD}  {len(unfinished)} unfinished call(s){RESET}")
+    out(f"  {DIM}Each was started and never recorded a result, so it may have "
+        f"connected.{RESET}\n")
+    for entry in unfinished:
+        out(f"  {BOLD}{mask_phone(entry.phone)}{RESET}  {DIM}claimed {entry.claimed_at}{RESET}")
+        out(f"    outcome {entry.outcome_id}  action {entry.action_id}")
+        out(f"    {DIM}it happened   :{RESET} outcome calls --store {args.store} "
+            f"--resolve {entry.idempotency_key}")
+        out(f"    {DIM}it did not    :{RESET} outcome calls --store {args.store} "
+            f"--forget {entry.idempotency_key}\n")
+    return 1
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     scenario, outcome = load_scenario(args.scenario)
     events: list[dict[str, Any]] = []
@@ -184,7 +381,19 @@ def cmd_run(args: argparse.Namespace) -> int:
             printer(event)
 
     printer = Printer(colour=sys.stdout.isatty() and not args.no_colour)
-    engine = Engine(_transport(args, scenario), on_event=sink)
+    transport = _transport(args, scenario)
+    if args.live:
+        problems = _check_live_preconditions(outcome, transport)
+        if problems:
+            raise SystemExit(
+                "Refusing to start a live run:\n\n  - " + "\n  - ".join(problems)
+            )
+    store = None
+    if args.store:
+        from .store import Store
+
+        store = Store(args.store)
+    engine = Engine(transport, on_event=sink, store=store)
     engine.run(outcome)
 
     while outcome.status is OutcomeStatus.AWAITING_APPROVAL:
@@ -225,7 +434,41 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Show the CALL-E request for the first call and stop.",
     )
+    run.add_argument(
+        "--allow-any-number",
+        action="store_true",
+        help="Run live without CALLE_ALLOWED_NUMBERS. Think before using this.",
+    )
+    run.add_argument(
+        "--store",
+        metavar="PATH",
+        help="Persist the run to a SQLite file, and record every call in a ledger so "
+        "a restart cannot dial the same number twice. Recommended for --live.",
+    )
     run.set_defaults(func=cmd_run)
+
+    calls = sub.add_parser(
+        "calls", help="Inspect the call ledger and clear calls left unfinished by a crash."
+    )
+    calls.add_argument("--store", required=True, metavar="PATH")
+    calls.add_argument("--resolve", metavar="KEY", help="The call did happen.")
+    calls.add_argument("--forget", metavar="KEY", help="The call never happened.")
+    calls.add_argument("--no-colour", action="store_true")
+    calls.set_defaults(func=cmd_calls)
+
+    pre = sub.add_parser(
+        "preflight",
+        help="Check a live run without placing one: credential, allowlist, window, "
+        "numbers, budget, and the exact first call script.",
+    )
+    pre.add_argument("scenario")
+    pre.add_argument("--no-colour", action="store_true")
+    pre.add_argument(
+        "--allow-any-number",
+        action="store_true",
+        help="Check without requiring CALLE_ALLOWED_NUMBERS.",
+    )
+    pre.set_defaults(func=cmd_preflight)
 
     args = parser.parse_args(argv)
     return args.func(args)

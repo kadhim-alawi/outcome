@@ -373,6 +373,18 @@ function renderEvent(e) {
                                           <div class="sub">${esc(e.reason)}</div>`);
     case "awaiting_user": return step("warn", `<h3>Waiting on you</h3>
                                           <div class="sub">${esc(e.purpose)}</div>`);
+    case "awaiting_window":
+      return step("warn", `<h3>Paused — outside the calling window</h3>
+        <div class="sub">${esc(e.detail)}</div>
+        <div class="lead">The run is not lost. It resumes at this call when the
+          window opens.</div>`);
+    case "unresolved_call":
+      return step("bad", `<h3>A call was started and never accounted for</h3>
+        <div class="sub"><span class="phone">${esc(e.phone)}</span></div>
+        <div class="lead">${esc(e.detail)}</div>`);
+    case "replayed":
+      return step("", `<h3>Already placed — replaying the stored result</h3>
+        <div class="sub">${esc(e.detail)}</div>`);
     case "error":     return step("bad", `<h3>Error</h3><div class="sub">${esc(e.detail)}</div>`);
     default: return;
   }
