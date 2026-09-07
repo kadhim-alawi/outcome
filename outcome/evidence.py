@@ -47,6 +47,19 @@ def _as_str_list(value: Any) -> list[str]:
     return []
 
 
+def _said_no(value: Any) -> bool:
+    """Read a yes/no/unknown field without turning "unknown" into "no".
+
+    CALL-E's guide prefers string enums with an `unknown` member over booleans,
+    because a phone call often cannot settle the question. Both shapes are
+    accepted here: a model that returns `false` and one that returns `"no"`
+    mean the same thing, and only an explicit no counts. "unknown" is not a no.
+    """
+    if value is False:
+        return True
+    return isinstance(value, str) and value.strip().lower() == "no"
+
+
 def _parse_verdict(structured: dict[str, Any], call: CallOutcome) -> CallVerdict:
     raw = str(structured.get("verdict", "")).strip().lower()
     try:
@@ -54,12 +67,11 @@ def _parse_verdict(structured: dict[str, Any], call: CallOutcome) -> CallVerdict
     except ValueError:
         verdict = None
 
-    reached = structured.get("reached")
     if not call.succeeded:
         # A call the provider could not complete is never testimony, whatever
         # the structured block claims.
         return CallVerdict.NO_ANSWER
-    if reached is False:
+    if _said_no(structured.get("reached")):
         return CallVerdict.NO_ANSWER
     if verdict is not None:
         return verdict
@@ -100,7 +112,10 @@ def _parse_offer(structured: dict[str, Any], org_id: str | None) -> Offer | None
     raw = structured.get("offer")
     if not isinstance(raw, dict):
         return None
-    summary = str(raw.get("summary") or "").strip()
+    # `what_is_offered` is the wire name: `summary` is a reserved recipient
+    # response field in CALL-E and cannot be used. Both are read, because a
+    # model handed either description may reach for the shorter word.
+    summary = str(raw.get("what_is_offered") or raw.get("summary") or "").strip()
     price = parse_money(raw.get("price"))
     eta = raw.get("eta")
     eta = str(eta).strip() if eta else None

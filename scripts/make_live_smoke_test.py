@@ -41,7 +41,7 @@ from outcome.models import mask_phone  # noqa: E402
 from outcome.window import CallWindow, WindowError  # noqa: E402
 
 
-def build(phone: str, timezone: str, today: date) -> dict:
+def build(phone: str, timezone: str, today: date, locale: str | None, region: str | None) -> dict:
     deadline = today + timedelta(days=7)
     return {
         "name": "live-smoke-test",
@@ -93,6 +93,10 @@ def build(phone: str, timezone: str, today: date) -> dict:
                     "name": "Test depot (you)",
                     "phone": phone,
                     "role": "The number you authorised for this test",
+                    # CALL-E refuses region/language pairs it does not serve, so
+                    # these are worth stating rather than leaving it to infer.
+                    **({"locale": locale} if locale else {}),
+                    **({"region": region} if region else {}),
                 }
             ],
         },
@@ -111,6 +115,12 @@ def main(argv: list[str] | None = None) -> int:
         "--phone",
         help="Override the number. Normally taken from CALLE_ALLOWED_NUMBERS.",
     )
+    parser.add_argument(
+        "--locale",
+        help="BCP 47 conversation locale, e.g. en-US or ar-BH. CALL-E refuses "
+        "region/language pairs it does not serve, so state it rather than let it infer.",
+    )
+    parser.add_argument("--region", help="Recipient country code, e.g. US, GB, BH.")
     args = parser.parse_args(argv)
 
     phone = args.phone
@@ -149,13 +159,17 @@ def main(argv: list[str] | None = None) -> int:
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(
-        json.dumps(build(phone, args.timezone, date.today()), indent=2) + "\n",
+        json.dumps(
+            build(phone, args.timezone, date.today(), args.locale, args.region), indent=2
+        )
+        + "\n",
         encoding="utf-8",
     )
     print(f"Wrote {OUT.relative_to(ROOT)}")
     print(f"  number   {mask_phone(phone)}")
     print(f"  window   {args.timezone}, always open (this is a test, not the pattern)")
-    print(f"  budget   1 call\n")
+    print(f"  locale   {args.locale or '(unset — CALL-E infers)'}" f"   region {args.region or '(unset)'}")
+    print("  budget   1 call\n")
     print("Next, and it costs nothing:")
     print("  python3 -m outcome.cli preflight scenarios/local/live-smoke-test.json")
     return 0

@@ -17,11 +17,13 @@ import sys
 from typing import Any
 
 from .calle import (
+    EVIDENCE_SCHEMA,
     CalleClient,
     CalleError,
     DryRunCalleClient,
     MockCalleClient,
     parse_allowed_numbers,
+    validate_result_schema,
 )
 from .engine import Engine
 from .loader import load_scenario
@@ -193,7 +195,16 @@ class Printer:
         )
 
     def _on_error(self, e):
-        return f"  {RED}error:{RESET} {e['detail']}"
+        return f"\n{RED}{BOLD}  FAILED{RESET}\n  {e['detail']}"
+
+    def _on_unresolved_call(self, e):
+        call_id = f"\n  {DIM}CALL-E call id: {e['call_id']}{RESET}" if e.get("call_id") else ""
+        return (
+            f"\n{RED}{BOLD}  UNRESOLVED CALL{RESET}\n  {e['detail']}{call_id}"
+        )
+
+    def _on_replayed(self, e):
+        return f"  {DIM}(already placed — replaying the stored result){RESET}"
 
 
 def _live_client(allow_any_number: bool = False) -> CalleClient:
@@ -300,6 +311,17 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         warnings.append(
             "No allowlist: the agent may dial any number it is given on a call."
         )
+
+    # Checked here because CALL-E rejects a bad schema with a 400 at dial time,
+    # which is a fine place to find out and a bad place to find out first.
+    schema_problems = validate_result_schema(EVIDENCE_SCHEMA)
+    if schema_problems:
+        out(f"  {BOLD}Result schema{RESET} {RED}unsupported by CALL-E{RESET}")
+        for problem in schema_problems:
+            out(f"    {RED}✗{RESET} {problem}")
+        problems.extend(schema_problems)
+    else:
+        out(f"  {BOLD}Result schema{RESET} {GREEN}within the documented subset{RESET}")
 
     window = outcome.call_window
     if window is None:

@@ -56,14 +56,14 @@
       "attempt": 1,
       "status": "completed",
       "structured": {
-        "reached": false,
+        "reached": "no",
         "verdict": "no_answer",
         "facts": [],
         "blockers": [
           "Rang out to voicemail; no option to hold."
         ],
         "referrals": [],
-        "offer": null
+        "offer": {}
       }
     },
     {
@@ -71,7 +71,7 @@
       "attempt": 2,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "blocked",
         "facts": [
           "Order BK-7741 is confirmed damaged in their system.",
@@ -89,7 +89,7 @@
             "reason": "Halden say Northgate hold stock of the identical box."
           }
         ],
-        "offer": null
+        "offer": {}
       }
     },
     {
@@ -97,7 +97,7 @@
       "attempt": 1,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "offer",
         "facts": [
           "They hold 500 of the identical insulated box in Bay 4.",
@@ -114,11 +114,11 @@
           }
         ],
         "offer": {
-          "summary": "500 insulated shipping boxes, next-day courier",
-          "price": 612.0,
+          "what_is_offered": "500 insulated shipping boxes, next-day courier",
+          "price": "612.00",
           "currency": "USD",
           "eta": "2026-09-10",
-          "reference": null
+          "reference": ""
         }
       }
     },
@@ -127,7 +127,7 @@
       "attempt": 1,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "offer",
         "facts": [
           "The depot has the same 500 boxes on the floor.",
@@ -137,11 +137,11 @@
         "blockers": [],
         "referrals": [],
         "offer": {
-          "summary": "500 insulated shipping boxes, local van delivery",
-          "price": 438.0,
+          "what_is_offered": "500 insulated shipping boxes, local van delivery",
+          "price": "438.00",
           "currency": "USD",
           "eta": "2026-09-10",
-          "reference": null
+          "reference": ""
         }
       }
     },
@@ -150,7 +150,7 @@
       "attempt": 2,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "confirmed",
         "facts": [
           "Replacement booked onto Thursday's van run.",
@@ -159,8 +159,8 @@
         "blockers": [],
         "referrals": [],
         "offer": {
-          "summary": "500 insulated shipping boxes, local van delivery",
-          "price": 438.0,
+          "what_is_offered": "500 insulated shipping boxes, local van delivery",
+          "price": "438.00",
           "currency": "USD",
           "eta": "2026-09-10",
           "reference": "BWD-48291"

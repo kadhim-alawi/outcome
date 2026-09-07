@@ -49,17 +49,59 @@ class CalleError(RuntimeError):
     pass
 
 
+class CalleCreateError(CalleError):
+    """CALL-E never accepted the request, so no call exists and no phone rang.
+
+    Worth its own type because it is the one failure where the safe assumption
+    flips. Everywhere else "we do not know whether it rang" means assume it
+    did; here we know it did not, so the ledger claim can be released and the
+    action costs nothing against the budget.
+    """
+
+
+class CallePollError(CalleError):
+    """The call was created and we could not learn how it ended.
+
+    Carries the id so a human can go and look it up rather than guess.
+    """
+
+    def __init__(self, message: str, call_id: str) -> None:
+        super().__init__(message)
+        self.call_id = call_id
+
+
 # --------------------------------------------------------------------------
 # The evidence schema OUTCOME asks every call to fill in
 # --------------------------------------------------------------------------
 
+# CALL-E accepts a documented subset of JSON Schema, and three of its rules
+# shaped this structure. Learned from a live 400, then confirmed against the
+# calls guide:
+#
+# 1. A `type` is one value. `["object", "null"]` is `anyOf` wearing a hat, and
+#    is rejected. Absence is expressed as an empty string or an empty array.
+# 2. `summary`, `status`, `transcript`, `call_id` and timing fields are
+#    reserved recipient response names. Hence `what_is_offered`.
+# 3. "If CALL-E cannot produce a schema-valid result from the evidence, the
+#    public structured_result is null" — all or nothing. So `required` holds
+#    the single field a call cannot be useful without. Requiring `facts` would
+#    trade a partial answer for no answer at all whenever a caller came back
+#    with a verdict and nothing quotable.
+#
+# Prices and dates are strings rather than numbers, for the same reason: a
+# number has no way to say "they never quoted one", and 0 is a lie a budget
+# check would happily accept. `evidence.parse_money` reads them back.
 EVIDENCE_SCHEMA: dict[str, Any] = {
     "type": "object",
-    "required": ["reached", "verdict", "facts"],
+    "required": ["verdict"],
     "properties": {
         "reached": {
-            "type": "boolean",
-            "description": "True only if a person actually spoke with you.",
+            "type": "string",
+            "enum": ["yes", "no", "unknown"],
+            "description": (
+                "yes only if a person actually spoke with you. no if nobody did. "
+                "unknown if you cannot tell."
+            ),
         },
         "verdict": {
             "type": "string",
@@ -77,45 +119,157 @@ EVIDENCE_SCHEMA: dict[str, Any] = {
             "items": {"type": "string"},
             "description": (
                 "Short statements of what the person actually said. Do not infer, "
-                "summarise or add anything they did not say."
+                "summarise or add anything they did not say. Empty if nothing was said."
             ),
         },
         "blockers": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Reasons given for why the objective cannot be met here.",
+            "description": (
+                "Reasons given for why the objective cannot be met here. Empty if none."
+            ),
         },
         "referrals": {
             "type": "array",
             "description": (
                 "Other organisations or departments they told you to contact, with the "
-                "number they gave. Leave empty if none were offered. Never invent a number."
+                "number they gave. Empty if none were offered. Never invent a number."
             ),
             "items": {
                 "type": "object",
                 "required": ["org_name"],
                 "properties": {
-                    "org_name": {"type": "string"},
-                    "phone": {"type": "string", "description": "E.164 if they gave one, else empty."},
-                    "role": {"type": "string"},
-                    "reason": {"type": "string"},
+                    "org_name": {"type": "string", "description": "Who they told you to call."},
+                    "phone": {
+                        "type": "string",
+                        "description": (
+                            "The number they read out, in E.164 such as +441234567890. "
+                            "Empty string if they did not give one."
+                        ),
+                    },
+                    "role": {"type": "string", "description": "What that organisation does."},
+                    "reason": {"type": "string", "description": "Why they sent you there."},
                 },
+                "additionalProperties": False,
             },
         },
         "offer": {
-            "type": ["object", "null"],
-            "description": "A concrete proposal, if one was made. Null otherwise.",
+            "type": "object",
+            "description": (
+                "A concrete proposal, if one was made. Leave every field empty if none was."
+            ),
             "properties": {
-                "summary": {"type": "string"},
-                "price": {"type": ["number", "null"], "description": "Total, in the stated currency."},
-                "currency": {"type": "string"},
-                "eta": {"type": ["string", "null"], "description": "YYYY-MM-DD if a date was given."},
-                "reference": {"type": ["string", "null"], "description": "Any reference or order number."},
+                "what_is_offered": {
+                    "type": "string",
+                    "description": (
+                        "What they proposed, in a few words. Empty string if they "
+                        "proposed nothing."
+                    ),
+                },
+                "price": {
+                    "type": "string",
+                    "description": (
+                        "The total amount only, digits and decimal point, such as 438.00. "
+                        "No currency symbol. Empty string if no price was quoted."
+                    ),
+                },
+                "currency": {
+                    "type": "string",
+                    "description": "Three-letter code such as USD. Empty string if not stated.",
+                },
+                "eta": {
+                    "type": "string",
+                    "description": (
+                        "The date they committed to, as YYYY-MM-DD. Empty string if no "
+                        "date was given."
+                    ),
+                },
+                "reference": {
+                    "type": "string",
+                    "description": (
+                        "Any reference, order or booking number they gave. Empty string "
+                        "if none."
+                    ),
+                },
             },
+            "additionalProperties": False,
         },
     },
     "additionalProperties": False,
 }
+
+# --------------------------------------------------------------------------
+# Checking a schema against what CALL-E documents as supported
+# --------------------------------------------------------------------------
+
+SUPPORTED_TYPES = frozenset(
+    {"object", "string", "number", "integer", "boolean", "array"}
+)
+UNSUPPORTED_KEYWORDS = (
+    "$ref", "oneOf", "anyOf", "allOf", "not", "patternProperties",
+    "additionalItems", "format", "if", "then", "else", "dependencies",
+)
+# Reserved recipient response field names, per the calls guide.
+RESERVED_RECIPIENT_FIELDS = frozenset(
+    {"summary", "status", "transcript", "call_id", "started_at", "ended_at", "duration"}
+)
+
+
+def validate_result_schema(schema: Any, path: str = "$", top_level: bool = True) -> list[str]:
+    """Check a result schema against the subset CALL-E documents as supported.
+
+    Written after a live run was refused with HTTP 400 for a nullable type. The
+    request never reached the phone, which is the good case; the bad case is
+    finding out at all, when the rules are published and checkable in advance.
+    Preflight runs this, so a bad schema costs nothing and no waiting.
+    """
+    problems: list[str] = []
+    if not isinstance(schema, dict):
+        return [f"{path}: expected a schema object, got {type(schema).__name__}."]
+
+    for keyword in UNSUPPORTED_KEYWORDS:
+        if keyword in schema:
+            problems.append(f"{path}: {keyword!r} is not supported by CALL-E.")
+
+    declared = schema.get("type")
+    if isinstance(declared, list):
+        problems.append(
+            f"{path}.type: {declared!r} is a union. CALL-E takes one type; express "
+            "absence with an empty string or an empty array instead of null."
+        )
+    elif isinstance(declared, str) and declared not in SUPPORTED_TYPES:
+        problems.append(f"{path}.type: {declared!r} is not one of {sorted(SUPPORTED_TYPES)}.")
+    elif declared is None:
+        problems.append(f"{path}: no 'type' declared.")
+
+    if schema.get("additionalProperties") is True:
+        problems.append(f"{path}: additionalProperties must be false.")
+
+    if declared == "object":
+        properties = schema.get("properties") or {}
+        if not isinstance(properties, dict):
+            problems.append(f"{path}.properties: expected an object.")
+            return problems
+        if top_level:
+            for name in sorted(set(properties) & RESERVED_RECIPIENT_FIELDS):
+                problems.append(
+                    f"{path}.properties.{name}: {name!r} is a reserved recipient "
+                    "response field name. Use a different one."
+                )
+        for name in sorted(schema.get("required") or []):
+            if name not in properties:
+                problems.append(f"{path}.required: {name!r} is not in properties.")
+        for name, child in properties.items():
+            problems.extend(validate_result_schema(child, f"{path}.{name}", top_level=False))
+
+    if declared == "array":
+        items = schema.get("items")
+        if items is None:
+            problems.append(f"{path}.items: an array needs items.")
+        else:
+            problems.extend(validate_result_schema(items, f"{path}[]", top_level=False))
+
+    return problems
 
 
 # --------------------------------------------------------------------------
@@ -131,11 +285,20 @@ class CallRequest:
     task: str
     metadata: dict[str, Any] = field(default_factory=dict)
     result_schema: dict[str, Any] = field(default_factory=lambda: dict(EVIDENCE_SCHEMA))
+    # CALL-E routes and language-checks per recipient. Omitted entirely when
+    # unset rather than sent as null, because the recipient object is strict.
+    locale: str | None = None
+    region: str | None = None
 
     def payload(self) -> dict[str, Any]:
+        recipient: dict[str, Any] = {"phones": [self.phone]}
+        if self.locale:
+            recipient["locale"] = self.locale
+        if self.region:
+            recipient["region"] = self.region
         return {
             "task": self.task,
-            "recipients": [{"phones": [self.phone]}],
+            "recipients": [recipient],
             "recipient_result_schema": self.result_schema,
             "metadata": dict(self.metadata),
         }
@@ -297,12 +460,25 @@ class CalleClient:
         return self._request("GET", "/v1/goals?limit=1")
 
     def place(self, request: CallRequest) -> CallOutcome:
+        """Dial, and be precise about which half failed if it does.
+
+        Everything before CALL-E accepts the request means no phone rang;
+        everything after means one did and we may not know how it went. Callers
+        act on that difference, so it is carried in the exception type rather
+        than left for them to infer from a message.
+        """
         self.assert_dialable(request.phone)
-        created = self.create_call(request)
+        try:
+            created = self.create_call(request)
+        except CalleError as exc:
+            raise CalleCreateError(str(exc)) from exc
         call_id = str(created.get("id") or "")
         if not call_id:
-            raise CalleError(f"CALL-E did not return a call id: {created!r}")
-        final = self._wait(call_id)
+            raise CalleCreateError(f"CALL-E did not return a call id: {created!r}")
+        try:
+            final = self._wait(call_id)
+        except CalleError as exc:
+            raise CallePollError(str(exc), call_id) from exc
         return CallOutcome(
             call_id=call_id,
             status=str(final.get("status", "failed")).lower(),

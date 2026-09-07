@@ -51,7 +51,13 @@ def _organizations(raw: Any) -> list[Organization]:
         # request collide with another run's organisation, and nothing outside
         # this process has a legitimate reason to name one.
         out.append(
-            Organization(name=name, phone=phone, role=str(item.get("role") or "").strip())
+            Organization(
+                name=name,
+                phone=phone,
+                role=str(item.get("role") or "").strip(),
+                locale=str(item.get("locale") or "").strip() or None,
+                region=str(item.get("region") or "").strip().upper() or None,
+            )
         )
     return out
 

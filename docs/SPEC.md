@@ -329,7 +329,7 @@ is the contract that makes calls composable, and the part most worth reusing:
 
 ```jsonc
 {
-  "reached":   true,                       // did a person actually speak
+  "reached":   "yes",                      // yes|no|unknown — did a person speak
   "verdict":   "blocked",                  // no_answer|refused|blocked|partial|offer|confirmed
   "facts":     ["Out of stock until the 30th."],
   "blockers":  ["No stock of insulated boxes until 30 September."],
@@ -337,10 +337,27 @@ is the contract that makes calls composable, and the part most worth reusing:
                  "phone": "+15550100002",  // E.164 or dropped
                  "role": "Regional distributor",
                  "reason": "They hold the identical box."}],
-  "offer":     {"summary": "...", "price": 438.0, "currency": "USD",
+  "offer":     {"what_is_offered": "...", "price": "438.00", "currency": "USD",
                 "eta": "2026-09-10", "reference": "BWD-48291"}
 }
 ```
+
+Three of CALL-E's rules shaped that structure. The first was learned from a
+live 400; all three are in its calls guide, and `validate_result_schema` now
+checks them so the next one is caught by `preflight` instead of by a dial.
+
+1. **A `type` is one value.** `["object", "null"]` is `anyOf` wearing a hat and
+   is rejected outright. Absence is an empty string or an empty array.
+2. **`summary`, `status`, `transcript`, `call_id` and timing fields are
+   reserved** recipient response names. Hence `what_is_offered`.
+3. **The result is all or nothing** — "if CALL-E cannot produce a schema-valid
+   result from the evidence, the public `structured_result` is `null`". So
+   `required` holds one field, `verdict`. Requiring `facts` would trade a
+   partial answer for no answer at all whenever a caller came back with a
+   verdict and nothing quotable.
+
+Prices and dates are strings for the same reason as (1): a number cannot say
+"they never quoted one", and `0` is a lie a budget check would accept.
 
 Parsing is defensive (`evidence.py`), because this is the least trustworthy
 input in the system — a model's reading of a phone conversation:
@@ -353,6 +370,28 @@ input in the system — a model's reading of a phone conversation:
 - A call the provider did not complete is never read as testimony, whatever the
   structured block claims.
 - An empty `offer: {}` is not an offer.
+
+### 7.1a Region and language
+
+`recipients[].locale` (BCP 47, e.g. `en-US`) and `recipients[].region` (country
+code, e.g. `US`) are per-recipient, and CALL-E refuses combinations it does not
+serve — HTTP 422 `call_not_ready`, before any dial. They are per-*party* here
+rather than per-run, because a chain of referrals can cross a border.
+
+**CALL-E does not publish the supported set.** Every example in its docs is
+`en-US`. Three live attempts established one data point the hard way:
+
+| Attempt | Result |
+|---|---|
+| No locale/region, `+973…` | 422 — "calls in English to Bahrain are not currently supported" |
+| `locale: ar-BH`, `region: BH` | 422 — "Bahrain (BH), with Arabic requested … not currently supported" |
+
+So the gate is the **region**, not the language. A demo needs a recipient number
+in a supported region; the operator's own location is irrelevant, since only the
+callee's number is checked.
+
+This is worth reporting upstream: an API that refuses a region should say which
+regions it serves, and the hackathon has a feedback prize.
 
 ### 7.2 Credits
 

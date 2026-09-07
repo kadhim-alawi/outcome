@@ -20,7 +20,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 
 from . import approval as approval_mod
-from .calle import CalleError, CalleTransport, CallOutcome, CallRequest
+from .calle import (
+    CalleCreateError,
+    CalleError,
+    CalleTransport,
+    CallOutcome,
+    CallRequest,
+)
 from .constraints import best_acceptable, evaluate
 from .evidence import extract
 from .models import (
@@ -259,6 +265,8 @@ class Engine:
             phone=org.phone,
             task=action.task_prompt,
             result_schema=action.result_schema,
+            locale=org.locale,
+            region=org.region,
             metadata={
                 "workflow": "outcome",
                 "outcome_id": outcome.id,
@@ -341,11 +349,31 @@ class Engine:
 
         try:
             call = self.transport.place(request)
-        except CalleError:
-            # The claim stays, and so does RUNNING. We do not know whether the
-            # phone rang, and the safe reading of "do not know" is "assume it
-            # did" — but the action must stay resumable so that clearing the
-            # ledger entry can put the run back on its feet.
+        except CalleCreateError as exc:
+            # CALL-E never accepted the request, so nothing rang. Release the
+            # claim: leaving it would strand the action behind a ledger entry
+            # for a call that does not exist, and make the operator clear a
+            # phantom. The action is REJECTED rather than FAILED so it does not
+            # count against a call budget it never spent.
+            self.store.forget_call(key)
+            action.status = ActionStatus.REJECTED
+            outcome.status = OutcomeStatus.AWAITING_USER
+            self._emit(
+                outcome,
+                "error",
+                {
+                    "action_id": action.id,
+                    "phone": mask_phone(request.phone),
+                    "detail": f"CALL-E refused the request, so no call was placed. {exc}",
+                },
+            )
+            return None
+        except CalleError as exc:
+            # The claim stays, and so does RUNNING. A call exists and we could
+            # not learn how it ended; the safe reading of "do not know" is
+            # "assume it rang" — but the action must stay resumable so that
+            # clearing the ledger entry can put the run back on its feet.
+            call_id = getattr(exc, "call_id", None)
             outcome.status = OutcomeStatus.AWAITING_USER
             self._emit(
                 outcome,
@@ -353,9 +381,11 @@ class Engine:
                 {
                     "action_id": action.id,
                     "phone": mask_phone(request.phone),
+                    "call_id": call_id,
                     "detail": (
-                        "The call failed in a way that does not say whether it "
-                        "connected. Refusing to retry it automatically."
+                        f"The call was created but its outcome is unknown: {exc} "
+                        "Refusing to retry it automatically. Clear it with: "
+                        f"outcome calls --resolve {key}"
                     ),
                 },
             )

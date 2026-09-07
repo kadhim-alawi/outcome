@@ -98,6 +98,12 @@ class Organization:
     name: str
     phone: str
     role: str = ""
+    # CALL-E routes and language-checks per recipient, and refuses combinations
+    # it does not serve — a live run was rejected with "calls in English to
+    # Bahrain are not currently supported". These carry that choice per party,
+    # not per run, because a chain of referrals can cross a border.
+    locale: str | None = None
+    region: str | None = None
     discovered_by: str | None = None
     id: str = field(default_factory=lambda: new_id("org"))
 
@@ -110,6 +116,8 @@ class Organization:
             name=d["name"],
             phone=d["phone"],
             role=d.get("role", ""),
+            locale=d.get("locale") or None,
+            region=d.get("region") or None,
             discovered_by=d.get("discovered_by"),
             id=d.get("id") or new_id("org"),
         )

@@ -55,7 +55,7 @@
       "attempt": 1,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "partial",
         "facts": [
           "The increase is USD 87.32 across two lines on the September bill.",
@@ -74,7 +74,7 @@
             "reason": "Credits above USD 50 have to be raised by billing."
           }
         ],
-        "offer": null
+        "offer": {}
       }
     },
     {
@@ -82,7 +82,7 @@
       "attempt": 1,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "offer",
         "facts": [
           "Billing can see the duplicate add-on and agrees it was not requested.",
@@ -99,11 +99,11 @@
           }
         ],
         "offer": {
-          "summary": "Goodwill credit for the duplicated data add-on",
-          "price": 40.0,
+          "what_is_offered": "Goodwill credit for the duplicated data add-on",
+          "price": "40.00",
           "currency": "USD",
           "eta": "2026-09-09",
-          "reference": null
+          "reference": ""
         }
       }
     },
@@ -112,7 +112,7 @@
       "attempt": 1,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "offer",
         "facts": [
           "Retentions confirm the second add-on was applied in error on 1 September.",
@@ -122,11 +122,11 @@
         "blockers": [],
         "referrals": [],
         "offer": {
-          "summary": "Full reversal of the duplicated Unlimited Data Boost",
-          "price": 62.5,
+          "what_is_offered": "Full reversal of the duplicated Unlimited Data Boost",
+          "price": "62.50",
           "currency": "USD",
           "eta": "2026-09-08",
-          "reference": null
+          "reference": ""
         }
       }
     },
@@ -135,7 +135,7 @@
       "attempt": 2,
       "status": "completed",
       "structured": {
-        "reached": true,
+        "reached": "yes",
         "verdict": "confirmed",
         "facts": [
           "Reversal raised against account 4471-88.",
@@ -144,8 +144,8 @@
         "blockers": [],
         "referrals": [],
         "offer": {
-          "summary": "Full reversal of the duplicated Unlimited Data Boost",
-          "price": 62.5,
+          "what_is_offered": "Full reversal of the duplicated Unlimited Data Boost",
+          "price": "62.50",
           "currency": "USD",
           "eta": "2026-09-08",
           "reference": "CR-77310"
