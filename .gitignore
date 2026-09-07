@@ -8,3 +8,8 @@ venv/
 *.db
 runs/
 .env
+
+# Generated scenarios that carry a real phone number. This repository is
+# public and the numbers in it are all fictional; a live run needs a real one,
+# so it is written here and never committed.
+scenarios/local/
