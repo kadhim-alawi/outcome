@@ -63,15 +63,22 @@ them on the phone.
 
 ## Quickstart
 
-No dependencies beyond Python 3.11 and no credential. Nothing here places a
-call unless you ask for `--live`.
+Python 3.11+, no credential, and nothing here places a call unless you ask for
+`--live`.
 
 ```bash
 python3 -m outcome.cli run scenarios/supplier-replacement.json     # terminal
 python3 -m outcome.cli run scenarios/bill-dispute.json             # a different shape
 python3 -m outcome.server                                          # http://127.0.0.1:8765
-python3 -m unittest discover -s tests                              # 85 tests
+python3 -m unittest discover -s tests                              # 94 tests
 ```
+
+**On Windows, first run `pip install tzdata`.** Windows ships no IANA timezone
+database, so `zoneinfo` has nothing to resolve `Europe/London` against and the
+calling window cannot be evaluated. `tzdata` is that database as pure data,
+maintained by the CPython core developers — it is the only thing this project
+needs beyond the standard library, and only there. Linux and macOS need
+nothing; `pip install -r requirements.txt` is a no-op on them.
 
 The CLI stops at the approval gate and asks. `--approve auto` answers yes,
 `--approve never` answers no — the run then goes back out to look for something

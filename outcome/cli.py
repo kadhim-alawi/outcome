@@ -58,12 +58,47 @@ def _mark(result: dict[str, Any]) -> str:
     return f"{DIM}?{RESET}"
 
 
+# A Windows console defaults to a legacy codepage, and printing "☎" to cp1252
+# raises rather than degrading — so the whole CLI dies on its first call. Ask
+# for UTF-8, and keep an ASCII set for the consoles that refuse.
+ASCII_FALLBACK = {
+    "▸": ">", "☎": "*", "✓": "+", "✗": "x", "○": "o",
+    "·": ".", "…": ".", "─": "-", "×": "x", "—": "-",
+}
+
+
+def _enable_utf8() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, OSError, ValueError):
+            pass
+
+
+def _console_takes_unicode() -> bool:
+    encoding = getattr(sys.stdout, "encoding", None) or "ascii"
+    try:
+        "".join(ASCII_FALLBACK).encode(encoding)
+    except (UnicodeEncodeError, LookupError):
+        return False
+    return True
+
+
 def _colour(enabled: bool, text: str) -> str:
-    if enabled:
-        return text
+    """The single choke point every line of CLI output passes through.
+
+    Does two downgrades: strips ANSI when colour is off, and swaps the symbols
+    for ASCII when the console cannot encode them. Both belong here rather than
+    at each call site, because a renderer that is only mostly applied is a
+    crash waiting for the one message nobody tested.
+    """
     out = text
-    for code in (RESET, DIM, BOLD, GREEN, YELLOW, RED, BLUE, CYAN):
-        out = out.replace(code, "")
+    if not enabled:
+        for code in (RESET, DIM, BOLD, GREEN, YELLOW, RED, BLUE, CYAN):
+            out = out.replace(code, "")
+    if not _console_takes_unicode():
+        for fancy, plain in ASCII_FALLBACK.items():
+            out = out.replace(fancy, plain)
     return out
 
 
@@ -412,6 +447,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _enable_utf8()
     parser = argparse.ArgumentParser(prog="outcome", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 

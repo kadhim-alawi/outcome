@@ -1,0 +1,6 @@
+# The repository was authored on Linux and is now edited on Windows too.
+# Normalise to LF in the repository so the two machines do not produce diffs
+# that are entirely line endings.
+* text=auto eol=lf
+*.png binary
+*.sqlite3 binary

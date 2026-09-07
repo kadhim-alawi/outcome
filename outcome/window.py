@@ -16,13 +16,33 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
 WEEKDAY_NAMES = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+NO_TZ_DATABASE = """Python cannot see an IANA timezone database on this machine, so a \
+calling window cannot be checked against the recipients' clock.
+
+Windows does not ship one. Install the data package:
+
+    pip install tzdata
+
+It is pure data, maintained by the CPython core developers, and is the only thing
+this project needs beyond the standard library."""
 
 
 class WindowError(ValueError):
     pass
+
+
+def tz_database_available() -> bool:
+    """Whether `zoneinfo` has any data to work with at all.
+
+    Distinguishing "this machine has no timezone database" from "that zone name
+    is wrong" matters more than it looks: the second message sent to someone
+    hitting the first problem tells them to fix input that was already correct.
+    """
+    return bool(available_timezones())
 
 
 def _parse_hhmm(value: str, label: str) -> tuple[int, int]:
@@ -49,6 +69,8 @@ class CallWindow:
         try:
             self._tz = ZoneInfo(self.timezone)
         except (ZoneInfoNotFoundError, ValueError, KeyError):
+            if not tz_database_available():
+                raise WindowError(NO_TZ_DATABASE) from None
             raise WindowError(
                 f"Unknown timezone {self.timezone!r}. Use an IANA name such as "
                 "'Europe/London' or 'Asia/Singapore'."

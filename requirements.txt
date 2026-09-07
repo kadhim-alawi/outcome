@@ -1,0 +1,10 @@
+# OUTCOME runs on the Python standard library alone on Linux and macOS.
+# There is nothing to install there, and `pip install -r requirements.txt`
+# is a no-op.
+#
+# Windows is the one exception. It ships no IANA timezone database, so
+# `zoneinfo` has nothing to resolve "Europe/London" against and the calling
+# window — which is checked in the recipients' timezone, not yours — cannot be
+# evaluated at all. `tzdata` is that database packaged as pure data, maintained
+# by the CPython core developers. No code, no transitive dependencies.
+tzdata; sys_platform == "win32"

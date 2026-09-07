@@ -35,20 +35,35 @@ class CrashingMock(MockCalleClient):
         return super().place(request)
 
 
-class StoreBasics(unittest.TestCase):
+class StoreTestCase(unittest.TestCase):
+    """Gives each test a temporary database that is actually released.
+
+    Every store has to be closed before the directory goes, because Windows
+    refuses to delete a file that is still open — on Linux the unlink succeeds
+    and the leak is invisible. `addCleanup` runs last-registered-first, so
+    stores opened during the test close ahead of the directory that holds them.
+    """
+
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.path = str(Path(self.dir.name) / "runs.sqlite3")
         self.addCleanup(self.dir.cleanup)
 
+    def open_store(self, path: str | None = None) -> Store:
+        store = Store(path or self.path)
+        self.addCleanup(store.close)
+        return store
+
+
+class StoreBasics(StoreTestCase):
     def test_a_run_is_reloadable_in_full(self):
         scenario, outcome = load_scenario(SCENARIO)
-        store = Store(self.path)
+        store = self.open_store()
         engine = Engine(MockCalleClient(scenario), store=store)
         engine.run(outcome)
         engine.approve(outcome, outcome.pending_approval_action_id)
 
-        reopened = Store(self.path)
+        reopened = self.open_store()
         restored = reopened.load(outcome.id)
         self.assertEqual(restored.to_dict(), outcome.to_dict())
         self.assertIs(restored.status, OutcomeStatus.RESOLVED)
@@ -57,7 +72,7 @@ class StoreBasics(unittest.TestCase):
 
     def test_every_dial_is_recorded_before_it_happens(self):
         scenario, outcome = load_scenario(SCENARIO)
-        store = Store(self.path)
+        store = self.open_store()
         Engine(MockCalleClient(scenario), store=store).run(outcome)
         ledger = store.calls_for(outcome.id)
         self.assertEqual(len(ledger), outcome.calls_placed())
@@ -65,7 +80,7 @@ class StoreBasics(unittest.TestCase):
 
     def test_events_are_durable_and_ordered(self):
         scenario, outcome = load_scenario(SCENARIO)
-        store = Store(self.path)
+        store = self.open_store()
         seen: list[dict] = []
         Engine(MockCalleClient(scenario), on_event=seen.append, store=store).run(outcome)
         stored = store.events_for(outcome.id)
@@ -79,13 +94,11 @@ class StoreBasics(unittest.TestCase):
         self.assertIs(outcome.status, OutcomeStatus.RESOLVED)
 
 
-class CrashRecovery(unittest.TestCase):
+class CrashRecovery(StoreTestCase):
     def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.path = str(Path(self.dir.name) / "runs.sqlite3")
-        self.addCleanup(self.dir.cleanup)
+        super().setUp()
         self.scenario, self.outcome = load_scenario(SCENARIO)
-        self.store = Store(self.path)
+        self.store = self.open_store()
 
     def crash_on_third_call(self) -> Outcome:
         engine = Engine(CrashingMock(self.scenario, crash_on=3), store=self.store)
@@ -174,18 +187,13 @@ class CrashRecovery(unittest.TestCase):
         self.assertFalse(self.store.resolve_call(finished.idempotency_key))
 
 
-class ReplayingACompletedCall(unittest.TestCase):
+class ReplayingACompletedCall(StoreTestCase):
     """The other half of the crash window: the call finished, and the process
     died before the result was written into the outcome."""
 
-    def setUp(self):
-        self.dir = tempfile.TemporaryDirectory()
-        self.path = str(Path(self.dir.name) / "runs.sqlite3")
-        self.addCleanup(self.dir.cleanup)
-
     def test_a_completed_call_is_replayed_not_repeated(self):
         scenario, outcome = load_scenario(SCENARIO)
-        store = Store(self.path)
+        store = self.open_store()
         Engine(MockCalleClient(scenario), store=store).run(outcome)
         placed_first_time = outcome.calls_placed()
 
