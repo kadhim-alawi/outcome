@@ -1,9 +1,25 @@
 # The three-minute demo
 
-Hard limit is 2:59. Everything below is timed against the real UI at
-`python3 -m outcome.server`, with `STEP_DELAY = 900` in `web/index.html` —
-that is the knob that controls pacing, and it is the only thing to tune if the
-cut runs long.
+Hard limit is 2:59.
+
+**Record at `http://127.0.0.1:8765/?pace=5000`.** The default 900ms feels right
+when you are driving the UI yourself and is far too fast to narrate over — the
+whole run lands in 14.7 seconds, so you would be talking over a finished screen.
+`?pace=5000` stretches it to 76 seconds, which is the speed somebody can talk
+through. Adjust between takes without touching the code; the clamp is 100–15000.
+
+Every timing below is **measured**, not estimated — from an instrumented run at
+`?pace=5000` that stamps each row as it lands. Times are given as clock
+positions assuming you click **Start** at 0:32.
+
+| Checkpoint | Measured |
+|---|---|
+| Start → approval card | 55.5 s |
+| Approve → result card | 20.9 s |
+| Whole run | 76.4 s |
+
+Everything after the approval card is under your control, since the run waits
+for the click.
 
 The single job of this video: make the viewer notice that **two of the three
 companies on screen were never typed in by the user.**
@@ -50,27 +66,36 @@ Click **Start**.
 
 ---
 
-## 0:32 — 1:35 · It works
+## 0:32 — 1:28 · It works
 
-Do not narrate every row. Say one line per beat and let the timeline run.
+Do not narrate every row — there are ten and you have about five seconds each.
+Say one line per beat and let the rest run silent. Silence over a moving
+timeline reads as confidence; filler over it reads as a tour.
 
-| Time | On screen | Say |
+| Lands at | On screen | Say |
 |---|---|---|
-| 0:32 | `☎ Call Halden Packaging` → `no answer` | "Nobody picks up." |
-| 0:38 | `Trying again` → `blocked` | "Second try. They're out of stock until the 30th — they can't help." |
-| 0:46 | **`New lead: Northgate Distribution`** | **"But they told it who could. That number came out of the phone call."** |
-| 0:56 | `☎ Call Northgate` → offer **$612** `REJECTED`, `✗ $112 over the USD 500.00 limit` | "Northgate has stock. Six twelve. That's over my limit — so the agent turns it down." |
-| 1:10 | **`New lead: Brightwater Depot`** | "And Northgate points at their own depot: same stock, no courier surcharge." |
-| 1:20 | `☎ Call Brightwater` → offer **$438** `MEETS YOUR REQUIREMENTS` | "Four thirty-eight. Thursday. Inside both rules." |
+| 0:32 | `☎ Call Halden Packaging — can they fix this, and if not, who can?` | *(let it go)* |
+| 0:37 | `Halden Packaging — no answer` | "Nobody picks up." |
+| 0:42 | `☎ Nobody answered at Halden Packaging. Trying again.` | — |
+| 0:47 | `Halden Packaging — blocked` · out of stock until the 30th | "Second try. They're out of stock — they can't help." |
+| **0:52** | **`New lead: Northgate Distribution`** | **"But they told it who could. That number came out of the phone call."** |
+| 0:57 | `☎ Call Northgate Distribution` | — |
+| 1:02 | offer **USD 612.00** · `REJECTED` · `✗ $112 over the USD 500.00 limit` | "Northgate has stock. Six twelve — over my limit, so it turns it down." |
+| 1:07 | **`New lead: Brightwater Depot`** | "And Northgate points at their own depot. No courier surcharge." |
+| 1:12 | `☎ Call Brightwater Depot` | — |
+| 1:17 | offer **USD 438.00** · `MEETS YOUR REQUIREMENTS` | "Four thirty-eight. Thursday. Inside both rules." |
+| 1:28 | approval card appears | *(stop talking)* |
 
-The 0:46 beat is the one that matters. Pause on it. If the edit needs to lose
-ten seconds, take them from 0:56, not here.
+**0:52 is the beat the whole video exists for.** If the edit has to lose ten
+seconds, take them from 0:57–1:12, never from here.
 
 ---
 
-## 1:35 — 2:05 · Approval
+## 1:28 — 1:53 · Approval
 
 The approval card is on screen with all three checks and the turned-down offer.
+**The run is waiting for you here**, so this section is the one place the clock
+is entirely yours — take the time to let a viewer read the card.
 
 > "It found something that works — and it stops.
 >
@@ -84,10 +109,16 @@ Click **Approve**.
 
 ---
 
-## 2:05 — 2:35 · The commit call
+## 1:53 — 2:14 · The commit call
 
-`☎ Call Brightwater Depot back to accept` with the **commits you** badge, then
-`confirmed`.
+Measured from the click, so these land on their own:
+
+| After the click | On screen |
+|---|---|
+| +0s | `You approved it` |
+| +5s | `☎ Call Brightwater Depot back to accept…` with the **commits you** badge |
+| +10s | `Brightwater Depot — confirmed` |
+| +21s | Result card |
 
 > "One call is authorised, and only for these exact terms. If the price or the
 > date had moved by the time it got through, it was told to walk away and come
@@ -98,7 +129,7 @@ Result card: **RESOLVED**, `Reference BWD-48291`, three green checks,
 
 ---
 
-## 2:35 — 2:50 · The point
+## 2:14 — 2:40 · The point
 
 Hold on the party list at the bottom of the result card:
 
@@ -114,7 +145,7 @@ Brightwater Depot      · 2 calls · confirmed  · found by the agent
 
 ---
 
-## 2:50 — 2:59 · Close
+## 2:40 — 2:55 · Close
 
 > "CALL-E can make a phone call.
 >
@@ -142,6 +173,14 @@ Last frame: the tagline. *Don't tell it who to call. Tell it what needs to happe
 - **Leave the `mock · no calls placed` badge in frame.** It is the first thing a
   sceptical reviewer looks for, and answering the question before it is asked is
   worth more than the pixels it costs.
-- **Captions.** Judges watch muted. The 0:46 and 1:10 lead beats especially.
+- **Captions.** Judges watch muted. The 0:52 and 1:07 lead beats especially.
+- **Re-measure if you change the pace.** `scripts/time_demo.mjs` stamps every
+  row as the page appends it, which is where the numbers above came from:
+
+  ```bash
+  python3 -m outcome.server &
+  npm install playwright && npx playwright install chromium
+  node scripts/time_demo.mjs 5000
+  ```
 - **Check the masking.** Every number on screen must render `+*******0002`.
   Nothing in this scenario is real, but the frame is what a viewer copies.

@@ -205,7 +205,15 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const STEP_DELAY = 900;
+// How long each row rests on screen before the next arrives. 900ms feels right
+// when you are driving it; it is far too fast to narrate over, because the whole
+// run lands in about fifteen seconds. `?pace=5000` slows it to roughly the speed
+// somebody can talk through, which is what recording a demo needs — and being a
+// query parameter, it can be adjusted between takes without touching the code.
+const STEP_DELAY = (() => {
+  const asked = Number(new URLSearchParams(location.search).get("pace"));
+  return Number.isFinite(asked) && asked > 0 ? Math.min(Math.max(asked, 100), 15000) : 900;
+})();
 const KINDS = ["budget", "minimum", "deadline", "required_fact", "preference", "forbidden"];
 let runId = null;
 let scenarios = [];

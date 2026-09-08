@@ -13,3 +13,8 @@ runs/
 # public and the numbers in it are all fictional; a live run needs a real one,
 # so it is written here and never committed.
 scenarios/local/
+
+# Only needed to run scripts/time_demo.mjs, which measures the demo pacing.
+node_modules/
+package.json
+package-lock.json

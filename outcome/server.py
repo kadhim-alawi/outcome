@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import threading
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -131,20 +132,34 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- routes ----------------------------------------------------------
 
+    @property
+    def route(self) -> str:
+        """The path with any query string removed.
+
+        Routing on `self.path` directly means `/?pace=5000` does not match `/`
+        and the page 404s — so every query parameter silently breaks the whole
+        UI, which is exactly the kind of thing you discover while recording.
+        """
+        return urllib.parse.urlsplit(self.path).path
+
+    def query(self) -> dict[str, list[str]]:
+        return urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+
     def do_GET(self) -> None:  # noqa: N802
-        if self.path in ("/", "/index.html"):
+        route = self.route
+        if route in ("/", "/index.html"):
             page = WEB_ROOT / "index.html"
             if not page.is_file():
                 return self._json(500, {"error": "web/index.html is missing."})
             return self._send(200, page.read_bytes(), "text/html; charset=utf-8")
-        if self.path == "/favicon.ico":
+        if route == "/favicon.ico":
             return self._send(200, FAVICON, "image/svg+xml")
-        if self.path == "/api/mode":
+        if route == "/api/mode":
             return self._json(200, {"live": self.live})
-        if self.path == "/api/scenarios":
+        if route == "/api/scenarios":
             return self._json(200, {"scenarios": self._scenarios()})
-        if self.path.startswith("/api/runs/"):
-            run_id = self.path.rsplit("/", 1)[-1].split("?")[0]
+        if route.startswith("/api/runs/"):
+            run_id = route.rsplit("/", 1)[-1]
             with _lock:
                 runner = _runs.get(run_id)
             if runner is None:
@@ -154,11 +169,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         body = self._read_json()
-        if self.path == "/api/interpret":
+        route = self.route
+        if route == "/api/interpret":
             return self._interpret(body)
-        if self.path == "/api/runs":
+        if route == "/api/runs":
             return self._start(body)
-        if self.path == "/api/decide":
+        if route == "/api/decide":
             return self._decide(body)
         return self._json(404, {"error": "Not found."})
 
