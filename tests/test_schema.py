@@ -13,6 +13,9 @@ a real dial did.
 
 from __future__ import annotations
 
+import json
+import pathlib
+import re
 import unittest
 
 from outcome.calle import (
@@ -224,6 +227,48 @@ class ShippedScenariosMatchTheWireFormat(unittest.TestCase):
                     self.assertNotIn("summary", offer, "'summary' is a reserved name")
                     if "price" in offer:
                         self.assertIsInstance(offer["price"], str)
+
+
+class TheContributedSkillMatchesTheCode(unittest.TestCase):
+    """The skill we contribute upstream documents this schema for other people
+    to copy. It drifted once already — it still carried the nullable version
+    after a live 400 had forced the fix here — which would have shipped the
+    exact defect we had just spent an evening finding."""
+
+    SKILL = (
+        pathlib.Path(__file__).resolve().parent.parent
+        / "contrib" / "skills" / "outcome-completion-agent"
+    )
+
+    def documented_schema(self) -> dict:
+        text = (self.SKILL / "references" / "evidence-schema.md").read_text(encoding="utf-8")
+        block = re.search(r"```json(.*?)```", text, re.S)
+        self.assertIsNotNone(block, "evidence-schema.md has no json block")
+        return json.loads(block.group(1))
+
+    def test_the_documented_schema_is_exactly_the_one_we_send(self):
+        self.assertEqual(self.documented_schema(), EVIDENCE_SCHEMA)
+
+    def test_the_documented_schema_is_one_call_e_accepts(self):
+        self.assertEqual(validate_result_schema(self.documented_schema()), [])
+
+    def test_no_copyable_json_teaches_the_rejected_shape(self):
+        """Only the fenced json blocks — the parts someone copies.
+
+        The prose deliberately quotes `{"type": ["object", "null"]}` as the
+        example of what CALL-E refuses, and that is the most useful sentence in
+        the file. Banning the substring outright would forbid explaining the
+        mistake, which is not the same as making it.
+        """
+        for path in sorted((self.SKILL / "references").glob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            for index, block in enumerate(re.findall(r"```json(.*?)```", text, re.S)):
+                with self.subTest(reference=path.name, block=index):
+                    self.assertNotIn('"type": ["', block, "a union type CALL-E rejects")
+                    self.assertNotIn('"reached": true', block, "reached is a string enum")
+                    self.assertNotIn('"offer": null', block, "offer is never null")
+                    self.assertNotIn('"summary"', block, "'summary' is a reserved name")
+                    json.loads(block)  # every published block must be valid JSON
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ Two of the three organisations were never supplied by the user. Both came out of
 
 ```json
 {
-  "reached": true,
+  "reached": "yes",
   "verdict": "blocked",
   "facts": [
     "Order BK-7741 is confirmed damaged in their system.",
@@ -59,7 +59,13 @@ Two of the three organisations were never supplied by the user. Both came out of
     "role": "Regional distributor carrying the same line",
     "reason": "Halden say Northgate hold stock of the identical box."
   }],
-  "offer": null
+  "offer": {
+    "what_is_offered": "",
+    "price": "",
+    "currency": "",
+    "eta": "",
+    "reference": ""
+  }
 }
 ```
 

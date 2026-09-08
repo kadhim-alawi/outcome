@@ -23,6 +23,7 @@ import re
 import sys
 
 VERDICTS = ("no_answer", "refused", "blocked", "partial", "offer", "confirmed")
+REACHED_VALUES = ("yes", "no", "unknown")
 E164 = re.compile(r"^\+[1-9]\d{6,14}$")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 MONEY = re.compile(r"-?\d+(?:[\d,]*\d)?(?:\.\d+)?")
@@ -45,6 +46,19 @@ def parse_money(value: object) -> float | None:
         return None
 
 
+def said_no(value: object) -> bool:
+    """Read a yes/no/unknown field without turning "unknown" into "no".
+
+    CALL-E prefers string enums with an `unknown` member over booleans, because
+    a phone call often cannot settle the question. Both shapes are accepted: a
+    model that returns `false` and one that returns `"no"` mean the same thing.
+    "unknown" is not a no.
+    """
+    if value is False:
+        return True
+    return isinstance(value, str) and value.strip().lower() == "no"
+
+
 def check(result: object) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     notes: list[str] = []
@@ -52,13 +66,19 @@ def check(result: object) -> tuple[list[str], list[str]]:
     if not isinstance(result, dict):
         return ([f"Top level must be an object, got {type(result).__name__}."], [])
 
-    for key in ("reached", "verdict", "facts"):
-        if key not in result:
-            errors.append(f"Missing required field {key!r}.")
+    # Only `verdict` is required. CALL-E returns null for the whole result when
+    # it cannot satisfy the schema, so a longer required list is a longer list
+    # of ways to lose the entire call.
+    if "verdict" not in result:
+        errors.append("Missing required field 'verdict'.")
 
     reached = result.get("reached")
-    if "reached" in result and not isinstance(reached, bool):
-        errors.append(f"'reached' must be a boolean, got {type(reached).__name__}.")
+    if "reached" in result and not (
+        isinstance(reached, bool) or (isinstance(reached, str) and reached in REACHED_VALUES)
+    ):
+        errors.append(
+            f"'reached' must be one of {', '.join(REACHED_VALUES)}; got {reached!r}."
+        )
 
     verdict = result.get("verdict")
     if "verdict" in result and verdict not in VERDICTS:
@@ -69,10 +89,10 @@ def check(result: object) -> tuple[list[str], list[str]]:
         if not isinstance(value, list) or any(not isinstance(v, str) for v in value):
             errors.append(f"{key!r} must be an array of strings.")
 
-    if reached is False and verdict not in (None, "no_answer", "refused"):
+    if said_no(reached) and verdict not in (None, "no_answer", "refused"):
         notes.append(
-            f"reached=false with verdict={verdict!r}: nothing was established, so a planner "
-            "will read this as no_answer and discard the rest."
+            f"reached says no with verdict={verdict!r}: nothing was established, so a "
+            "planner will read this as no_answer and discard the rest."
         )
 
     referrals = result.get("referrals", [])
@@ -99,20 +119,25 @@ def check(result: object) -> tuple[list[str], list[str]]:
     offer = result.get("offer")
     if offer is not None:
         if not isinstance(offer, dict):
-            errors.append("'offer' must be an object or null.")
+            errors.append("'offer' must be an object.")
         else:
-            summary = str(offer.get("summary") or "").strip()
+            # `what_is_offered` is the wire name: `summary` is a reserved
+            # recipient response field in CALL-E. Both are read, because a model
+            # handed either description may reach for the shorter word.
+            summary = str(offer.get("what_is_offered") or offer.get("summary") or "").strip()
             price_raw = offer.get("price")
             price = parse_money(price_raw)
             eta = offer.get("eta")
             if not summary and price is None and not eta:
-                notes.append("'offer' has no summary, price or date and will be read as no offer.")
-            if price_raw is not None and price is None:
+                notes.append(
+                    "'offer' has no description, price or date and will be read as no offer."
+                )
+            if price_raw not in (None, "") and price is None:
                 notes.append(
                     f"offer.price {price_raw!r} is unreadable and will be treated as unknown, "
                     "so a budget constraint cannot block this offer."
                 )
-            if price is None and price_raw is None:
+            if price is None and price_raw in (None, ""):
                 notes.append(
                     "offer.price is absent: a budget constraint will judge this unknown, "
                     "not satisfied."

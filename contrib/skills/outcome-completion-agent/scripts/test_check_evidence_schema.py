@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from check_evidence_schema import check, parse_money  # noqa: E402
+from check_evidence_schema import check, parse_money, said_no  # noqa: E402
 
 
 def errors(result: object) -> list[str]:
@@ -26,14 +26,14 @@ def notes(result: object) -> list[str]:
 
 
 GOOD = {
-    "reached": True,
+    "reached": "yes",
     "verdict": "confirmed",
     "facts": ["Booked onto Thursday's van run."],
     "blockers": [],
     "referrals": [],
     "offer": {
-        "summary": "500 insulated shipping boxes",
-        "price": 438.0,
+        "what_is_offered": "500 insulated shipping boxes",
+        "price": "438.00",
         "currency": "USD",
         "eta": "2026-09-10",
         "reference": "BWD-48291",
@@ -57,10 +57,12 @@ class Required(unittest.TestCase):
     def test_a_complete_result_is_clean(self):
         self.assertEqual(check(GOOD), ([], []))
 
-    def test_missing_required_fields_are_errors(self):
+    def test_only_verdict_is_required(self):
+        """CALL-E returns null for the whole result when it cannot satisfy the
+        schema, so every extra required field is another way to lose the call."""
         found = errors({})
-        self.assertEqual(len(found), 3)
-        self.assertTrue(all("Missing required field" in message for message in found))
+        self.assertEqual(found, ["Missing required field 'verdict'."])
+        self.assertEqual(errors({"verdict": "partial"}), [])
 
     def test_an_unknown_verdict_is_an_error(self):
         self.assertTrue(any("verdict" in m for m in errors({**GOOD, "verdict": "maybe"})))
@@ -106,7 +108,7 @@ class Offers(unittest.TestCase):
         self.assertTrue(any("YYYY-MM-DD" in m for m in notes({**GOOD, "offer": offer})))
 
     def test_a_confirmation_without_a_reference_is_flagged(self):
-        offer = {**GOOD["offer"], "reference": None}
+        offer = {**GOOD["offer"], "reference": ""}
         self.assertTrue(any("reference" in m for m in notes({**GOOD, "offer": offer})))
 
     def test_an_empty_offer_reads_as_no_offer(self):
@@ -121,9 +123,29 @@ class Offers(unittest.TestCase):
         )
 
 
+class ReachedIsAnEnum(unittest.TestCase):
+    """CALL-E prefers a string enum with `unknown` over a boolean, because a
+    call often cannot settle the question."""
+
+    def test_the_three_values_are_accepted(self):
+        for value in ("yes", "no", "unknown"):
+            self.assertEqual(errors({**GOOD, "reached": value}), [], value)
+
+    def test_a_boolean_is_still_accepted(self):
+        self.assertEqual(errors({**GOOD, "reached": False}), [])
+
+    def test_anything_else_is_an_error(self):
+        self.assertTrue(errors({**GOOD, "reached": "maybe"}))
+
+    def test_unknown_is_not_a_no(self):
+        self.assertFalse(said_no("unknown"))
+        self.assertTrue(said_no("no"))
+        self.assertTrue(said_no(False))
+
+
 class Consistency(unittest.TestCase):
     def test_not_reached_with_a_rich_verdict_is_flagged(self):
-        found = notes({**GOOD, "reached": False})
+        found = notes({**GOOD, "reached": "no"})
         self.assertTrue(any("nothing was established" in m for m in found))
 
     def test_unknown_fields_are_reported_as_ignored(self):
