@@ -143,7 +143,7 @@ EVIDENCE_SCHEMA: dict[str, Any] = {
                     "phone": {
                         "type": "string",
                         "description": (
-                            "The number they read out, in E.164 such as +441234567890. "
+                            "The number they read out, in E.164 such as +447700900123. "
                             "Empty string if they did not give one."
                         ),
                     },

@@ -39,7 +39,7 @@ Pass it as `recipient_result_schema` on `POST /v1/calls`.
         "required": ["org_name"],
         "properties": {
           "org_name": {"type": "string", "description": "Who they told you to call."},
-          "phone": {"type": "string", "description": "The number they read out, in E.164 such as +441234567890. Empty string if they did not give one."},
+          "phone": {"type": "string", "description": "The number they read out, in E.164 such as +447700900123. Empty string if they did not give one."},
           "role": {"type": "string", "description": "What that organisation does."},
           "reason": {"type": "string", "description": "Why they sent you there."}
         },
