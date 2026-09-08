@@ -23,24 +23,34 @@ Say *one phone number* clearly. It is the setup for the whole video.
 
 ---
 
-## 0:18 — 0:30 · Create the outcome
+## 0:18 — 0:32 · Create the outcome
 
-Type into the box, do not paste:
+Type into the box, do not paste. Typing reads as real; pasting reads as a
+rehearsal.
 
 > Get a replacement pallet of 500 insulated shipping boxes for the crushed
 > delivery on order BK-7741.
 
-Constraint chips appear: `budget · at or under USD 500`,
-`deadline · on or before 2026-09-11`.
+Click **Read the requirements out of this**. The requirement rows fill
+themselves in — `budget · Total cost at or under USD 500 · must`, and
+`deadline · Resolved on or before 2026-09-11 · must`.
 
-> "I'm not creating a call. I'm creating an outcome — the goal, and the two
-> rules any answer has to satisfy."
+> "I'm not creating a call. I'm creating an outcome: the goal, and the rules any
+> answer has to satisfy. **Must**, not *prefer* — an answer that breaks one of
+> these is not an answer."
+
+Now scroll one line to **Who to call first** and **hold there for three
+seconds**. One row: Halden Packaging.
+
+> "And that's everything I've given it. One phone number."
+
+That hold is the setup for the last shot of the video. Do not rush it.
 
 Click **Start**.
 
 ---
 
-## 0:30 — 1:35 · It works
+## 0:32 — 1:35 · It works
 
 Do not narrate every row. Say one line per beat and let the timeline run.
 
@@ -126,6 +136,12 @@ Last frame: the tagline. *Don't tell it who to call. Tell it what needs to happe
 - **Do not show the constraint JSON, the code, or the architecture diagram.**
   A reviewer who wants those opens the repo. Spend all 179 seconds on the agent
   doing the thing.
+- **Use the Reset button between takes.** It repopulates the form from the
+  selected scenario, so every take starts identical. The scenario dropdown
+  already opens on the supplier run.
+- **Leave the `mock · no calls placed` badge in frame.** It is the first thing a
+  sceptical reviewer looks for, and answering the question before it is asked is
+  worth more than the pixels it costs.
 - **Captions.** Judges watch muted. The 0:46 and 1:10 lead beats especially.
 - **Check the masking.** Every number on screen must render `+*******0002`.
   Nothing in this scenario is real, but the frame is what a viewer copies.

@@ -252,7 +252,8 @@ would have been rehearsing something that cannot happen.
   than this demo, including the three CALL-E schema rules that cost us a live call.
 - **Demo video:** **[TBD]**
 - **CALL-E account email:** **[TBD — the address on your CALL-E account]**
-- **Feedback for CALL-E:** [`docs/calle-feedback.md`](calle-feedback.md)
+- **API notes:** [`docs/calle-api-notes.md`](calle-api-notes.md) — the schema and
+  region constraints we hit, with the exact requests and errors.
 
 ---
 
@@ -264,6 +265,4 @@ would have been rehearsing something that cannot happen.
    [`demo-script.md`](demo-script.md).
 2. **The regional paragraph** in *Challenges* needs updating if a live call
    succeeds before the deadline.
-3. **Send the feedback** in `calle-feedback.md`. There is a separate feedback
-   prize, and the region gap is real.
-4. Fill both **[TBD]** links above.
+3. Fill both **[TBD]** links above.

@@ -1,7 +1,11 @@
-# Feedback for CALL-E
+# Notes on the CALL-E Developer API
 
-Findings from building [OUTCOME](../README.md) against the Developer API v0.6.0.
-Each one cost real time to discover and is cheap to fix.
+Things we hit building [OUTCOME](../README.md) against v0.6.0 that are not
+obvious from the docs, written down so the next person does not spend the time
+we did. Each entry has the exact request and the exact error.
+
+The suggested fixes are kept because they explain *why* each gap costs time, not
+because this document was sent anywhere.
 
 ---
 
