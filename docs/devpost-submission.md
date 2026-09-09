@@ -197,11 +197,28 @@ calls for that region/language combination are not currently supported."
 We tested both English and Arabic; the gate is the region, not the language. The
 supported set is not published anywhere in the docs, the OpenAPI schema, or the
 error body — so this is only discoverable *after* signing up, integrating, and
-making a request that fails. **[TBD: update this paragraph if CALL-E enables the
-region or supplies a callable number before submission.]**
+making a request that fails.
 
-Every one of those three refusals happened **before the dial**, so none of them
-cost a credit. That behaviour is genuinely good API design and it is the reason
+**Then the workaround hit a second wall.** The obvious fix is to rent a number in
+a supported region and forward it, so we did: a US number from a VoIP provider,
+pointed at a SIP softphone. Calls to it never arrived — and never appeared in the
+provider's own logs either, which is the tell that they were rejected at the edge
+rather than misrouted. The cause was in the provider's account-level
+documentation rather than any error message:
+
+> **Voice → Inbound: limited to receiving from the verified phone number.**
+
+That restriction applies at both of their unpaid account tiers. CALL-E dials from
+its own numbers, which will never be a developer's single verified number, so
+inbound from CALL-E can never be accepted on an unpaid account — not as a bug, by
+design. Reaching the tier that lifts it requires a card payment.
+
+So the two blockers are independent and neither is a defect in this project:
+CALL-E does not serve our region, and the cheap way around that needs a paid
+telephony account. **[TBD: update if a live call is made before submission.]**
+
+Every refusal along the way happened **before the dial**, so none of them cost a
+CALL-E credit. That behaviour is genuinely good API design, and it is the reason
 this section exists instead of a bill.
 
 ## Accomplishments we're proud of
