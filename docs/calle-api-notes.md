@@ -110,7 +110,10 @@ API would mean every integrator does not have to.
 
 ---
 
-## 4. The concurrency limit tells you to wait, but not what for
+## 4. A failed call never releases its concurrency slot
+
+**Severity: blocking, and we believe this is a backend bug rather than a
+documentation gap.**
 
 A non-KYC account gets one concurrent call task, and exceeding it returns:
 
@@ -124,20 +127,92 @@ task to finish, then retry."
 The limit itself is reasonable, and the error is unusually good: it names the
 number, says where the limit is shared from, and links the upgrade path.
 
-The gap is the instruction. **"Wait for an active task to finish" is not
-actionable when nothing lets you see the active tasks.** `GET /v1/calls` returns
-405, so there is no list endpoint; `GET /v1/calls/{id}` only helps for ids you
-already hold. We hit this holding a local ledger of every call we had placed,
-checked each one, found them all terminal — and were still refused. Whatever
-held the slot was invisible to us.
+We hit it on our *second* call. The first — `call_lM98oxbW32A5n2xWMEsmjA` — had
+rung a real phone, gone unanswered, and finished. `GET /v1/calls/{call_id}`
+agreed:
 
-**Suggested fixes:**
+```
+{"id":"call_lM98oxbW32A5n2xWMEsmjA","status":"failed", … }
+```
 
-1. Return the blocking task's id in the 429 body:
-   `"details": {"active_task_ids": ["call_…"]}`. The caller can then poll or
-   cancel it, and the "wait for an active task" instruction becomes followable.
-2. Add `GET /v1/calls?status=in_progress`, or any read-only way to enumerate
-   active tasks.
+`failed` is terminal. The dashboard showed no calls at all, the account had 100
+credits, and every subsequent `POST /v1/calls` was refused with the 429 above.
+
+### What is actually happening
+
+`GET /v1/calls/{call_id}/events` shows it. The call reaches its terminal state
+once and then **re-enters it, over and over, indefinitely:**
+
+```
+18:52:22Z  call.started      run_call started.
+18:52:25Z  call.in_progress  botlab create bot.
+18:53:01Z  call.updated      calling task status=calling
+18:53:26Z  call.updated      Call ended; syncing final Calling result.
+18:53:48Z  call.updated      calling task status=NO ANSWER
+18:54:00Z  call.failed       calling task completed with status=NO ANSWER   ← terminal
+18:56:09Z  call.updated      calling task status=NO ANSWER
+18:56:11Z  call.failed       calling task completed with status=NO ANSWER   ← again
+18:58:19Z  call.updated      calling task status=NO ANSWER
+18:58:20Z  call.failed       calling task completed with status=NO ANSWER   ← again
+   …
+20:35:21Z  call.failed       calling task completed with status=NO ANSWER   ← still going
+```
+
+The call reached `NO ANSWER` at 18:53:48Z and emitted `call.failed` at
+18:54:00Z. **One hour and forty-one minutes later it was still emitting the same
+pair every two minutes**, and was still doing so when we stopped counting:
+
+| | |
+|---|---|
+| Events on the call | 184 |
+| `call.failed` events | **88** |
+| `call.updated` events | 92 |
+| First event | `2026-09-10T18:52:22Z` |
+| Last event | `2026-09-10T20:35:21Z` |
+| Duration past terminal | **1 h 41 m and counting** |
+
+So the worker that syncs the result from the underlying calling provider never
+stops re-syncing a call that is already finished. The read API reports the call
+as `failed`, but the task is evidently still live internally — which is exactly
+what the concurrency accounting is counting. **The slot is held by a call that
+every developer-visible surface says is over.**
+
+The practical effect on a one-slot account is total: a single unanswered call
+permanently disables the API. Nothing the developer can do releases it, because
+there is no cancel endpoint.
+
+**Reproduction:** place a call to a number that does not answer, wait for
+`status: failed`, then poll `GET /v1/calls/{call_id}/events`. If `call.failed`
+appears more than once, the slot is stuck.
+
+**Suggested fixes, in order of importance:**
+
+1. **Stop the sync loop at the first terminal event.** `NO ANSWER` is not a
+   retryable condition, and 88 identical `call.failed` events for one call is
+   the symptom of a retry with no terminal check and no attempt ceiling.
+2. **Release the concurrency slot when the call reaches a terminal status**,
+   independently of whatever the sync worker is doing. The developer-visible
+   status and the internal accounting disagreeing is the part that makes this
+   undiagnosable from outside.
+3. **Add a cancel:** `POST /v1/calls/{call_id}/cancel` or `DELETE
+   /v1/calls/{call_id}`. There is currently no way for a developer to release a
+   slot, so a bug like this is unrecoverable without contacting support.
+4. Return the blocking task's id in the 429 body:
+   `"details": {"active_task_ids": ["call_…"]}`. The error says to "wait for an
+   active task to finish", but there is no list endpoint (`GET /v1/calls`
+   returns 405), so the instruction is not followable. Had the 429 named
+   `call_lM98oxbW32A5n2xWMEsmjA`, this would have taken minutes instead of a day.
+5. `account_concurrency_exceeded` is **not in the documented error-code enum**
+   in `calle.openapi.yaml` (v0.7.0), which lists `rate_limit_exceeded` for 429.
+   A caller writing exhaustive error handling from the spec will not have a
+   branch for the one 429 they are most likely to see.
+
+Credit where it is due: `GET /v1/calls/{call_id}/events` is what made this
+diagnosable at all, and it is a genuinely good endpoint — per-event `level`,
+`status` and `message`, cursor paging, and enough detail to see a backend loop
+from the outside. We had built against v0.6.0 and did not know it existed; it is
+worth pointing at from the calls guide, because it is the first thing anyone
+debugging a stuck call should reach for.
 
 One design note, since it is a compliment rather than a complaint: a
 concurrency limit of 1 is a perfectly comfortable fit for an agent like this
