@@ -110,7 +110,43 @@ API would mean every integrator does not have to.
 
 ---
 
-## 4. Smaller things
+## 4. The concurrency limit tells you to wait, but not what for
+
+A non-KYC account gets one concurrent call task, and exceeding it returns:
+
+```
+HTTP 429 account_concurrency_exceeded
+"Your default shared line (such as us/all) is at its account concurrency limit
+of 1. This limit is shared across API, MCP, and Dashboard. Wait for an active
+task to finish, then retry."
+```
+
+The limit itself is reasonable, and the error is unusually good: it names the
+number, says where the limit is shared from, and links the upgrade path.
+
+The gap is the instruction. **"Wait for an active task to finish" is not
+actionable when nothing lets you see the active tasks.** `GET /v1/calls` returns
+405, so there is no list endpoint; `GET /v1/calls/{id}` only helps for ids you
+already hold. We hit this holding a local ledger of every call we had placed,
+checked each one, found them all terminal — and were still refused. Whatever
+held the slot was invisible to us.
+
+**Suggested fixes:**
+
+1. Return the blocking task's id in the 429 body:
+   `"details": {"active_task_ids": ["call_…"]}`. The caller can then poll or
+   cancel it, and the "wait for an active task" instruction becomes followable.
+2. Add `GET /v1/calls?status=in_progress`, or any read-only way to enumerate
+   active tasks.
+
+One design note, since it is a compliment rather than a complaint: a
+concurrency limit of 1 is a perfectly comfortable fit for an agent like this
+one. OUTCOME is strictly sequential by construction — it decides who to call
+next *from* what the last call said, so it can never want two lines at once.
+Anything doing parallel fan-out would feel this limit immediately; anything
+doing genuine multi-step reasoning will not.
+
+## 5. Smaller things
 
 - **Reserved recipient response field names** (`summary`, `status`,
   `transcript`, `call_id`, timing fields) are documented in prose in the calls
