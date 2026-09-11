@@ -70,7 +70,7 @@ Python 3.11+, no credential, and nothing here places a call unless you ask for
 python3 -m outcome.cli run scenarios/supplier-replacement.json     # terminal
 python3 -m outcome.cli run scenarios/bill-dispute.json             # a different shape
 python3 -m outcome.server                                          # http://127.0.0.1:8765
-python3 -m unittest discover -s tests                              # 94 tests
+python3 -m unittest discover -s tests                              # 137 tests
 ```
 
 **On Windows, first run `pip install tzdata`.** Windows ships no IANA timezone

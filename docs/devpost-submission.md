@@ -14,11 +14,7 @@ Don't tell it who to call. Tell it what needs to happen.
 
 ## Elevator pitch (Devpost's short field)
 
-An autonomous phone-work agent that owns a goal to resolution. You give it an
-outcome and the limits an answer has to satisfy. It works out who to call, calls
-them, and — when the answer is "we can't help, try these people" — calls those
-people instead. The list of who to ring is discovered on the phone, not supplied
-up front.
+An autonomous AI phone agent that owns goals to resolution. Give it an outcome and constraints, and it dynamically finds contacts, follows referrals, and self-navigates calls until resolved.
 
 ---
 
@@ -131,7 +127,7 @@ goal + constraints
   so the engine cannot tell which it is talking to. The run you rehearse offline
   is the run that happens on the phone.
 
-**124 tests**, no network, no credentials.
+**137 tests**, no network, no credentials.
 
 ## Safety
 
@@ -259,7 +255,7 @@ would have been rehearsing something that cannot happen.
 
 ## Built with
 
-`python` · `sqlite` · `call-e` · `json-schema` · `html` · `javascript`
+`python` · `sqlite` · `call-e` · `json-schema` · `html` · `javascript`  
 
 ## Links
 
