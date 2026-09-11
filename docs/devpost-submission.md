@@ -373,19 +373,27 @@ offline is the run that happens on the phone.
 
 WHY THE DEMO IS NOT LIVE:
 
-CALL-E does not currently place calls to Bahrain, where I am:
+Three independent blockers, none of them a defect in this project.
 
-    HTTP 422 call_not_ready
-    "The recipient number appears to be in Bahrain (BH), with Arabic requested,
-     but calls for that region/language combination are not currently supported."
+ 1. CALL-E does not currently place calls to my region, so it cannot ring a
+    phone I own. HTTP 422 call_not_ready, tested in both English and Arabic —
+    the gate is the region, not the language.
 
-Tested in both English and Arabic — the gate is the region, not the language.
-Renting a US number and forwarding it hit a second wall unrelated to CALL-E
-(unpaid VoIP tiers accept inbound only from a single verified number, which
-CALL-E's outbound numbers can never be).
+ 2. The usual workaround is to rent a number in a supported region and forward
+    it, so I did: a US number pointed at a SIP softphone. It rings when I dial
+    it myself. When CALL-E dialled it, the attempt returned SIP 408 in zero
+    seconds and never reached the handset — which is what the provider's unpaid
+    tiers document, inbound limited to calls from your one verified number, and
+    CALL-E dials from its own.
 
-Every refusal happened before the dial, so none of it cost a credit. The exact
-requests and errors are in docs/calle-api-notes.md.
+ 3. That one attempt then stuck the account. The call finished as NO ANSWER but
+    never released its concurrency slot, and every request since has been
+    refused with HTTP 429 account_concurrency_exceeded. There is no cancel
+    endpoint, so it cannot be cleared from this side.
+
+Blockers 1 and 2 cost no credits — both refusals happen before the dial. The
+exact requests, errors and the event trace behind blocker 3 are in
+docs/calle-api-notes.md.
 ```
 
 ## In one sentence, what real-world task does your CALL-E application handle?
