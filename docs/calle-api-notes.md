@@ -9,9 +9,9 @@ because this document was sent anywhere.
 
 ---
 
-## 1. The API refuses a region without saying which regions it serves
+## 1. The 422 does not point at the region list, and we never found it
 
-**Severity: blocking.** This is the one that stopped the project.
+**Severity: was blocking for us, but through our own mistake — see the correction below.**
 
 Creating a call to a Bahraini number is rejected:
 
@@ -36,32 +36,48 @@ supported region/language combination should be used instead if you want to
 continue?"
 ```
 
-The message asks the developer to pick a supported combination, but **nothing
-published says what they are**. Searching the docs for the supported set finds
-nothing: `calls.mdx` documents `locale` and `region` as free-text hints, the
-OpenAPI schema types them as nullable strings with `en-US` as the example, and
-the error enum has `unsupported_region` and `unsupported_language` without an
-accompanying list.
+### Correction — the matrix exists, and we missed it
 
-The practical effect: a developer outside a supported region cannot tell whether
-the product works for them until after they have signed up, obtained a key,
-integrated, and made a request that fails. In our case the entire integration
-was finished before we learned we could not place a single call.
+**An earlier version of this note said the supported set was not published
+anywhere. That was wrong, and the mistake was ours.** There is a full
+`Supported Regions and Languages` table — 44 countries, with country code,
+calling code, languages, and whether the line is Local or International — in the
+[`call-e-integrations`
+README](https://github.com/CALLE-AI/call-e-integrations#supported-regions-and-languages),
+which is the first link on the hackathon resources page. Bahrain is genuinely not
+on it, so the 422 was correct; we simply never found the answer.
 
-**Suggested fixes, cheapest first:**
+We went looking in the API surface — `docs.heycall-e.com`, `calle.openapi.yaml`,
+the calls guide — because that is where an error from `POST /v1/calls` sends you.
+The matrix lives in the integrations repository instead, which reads as a setup
+guide rather than a reference.
 
-1. Put the supported region/language matrix in the docs, next to `locale` and
-   `region` in the calls guide. A table would do.
-2. Return the supported set in the 422 body — the error already asks the
-   developer to choose one, so it may as well say what is on the menu:
-   `"details": {"supported": [{"region": "US", "locales": ["en-US"]}, …]}`.
-3. Expose it as a read-only endpoint, e.g. `GET /v1/regions`, so an application
-   can check before it builds a workflow around a number it cannot dial. This
-   would also let a preflight check catch it, which is where it belongs.
+So the feedback survives, but much smaller than we first wrote it:
+
+1. **Cross-link the matrix from the API reference.** `calls.mdx` documents
+   `locale` and `region` as free-text hints and the OpenAPI schema types them as
+   nullable strings with `en-US` as the example. Neither points at the table. One
+   link next to the `region` field would have saved us the entire detour.
+2. **Return the supported set, or a link to it, in the 422 body.** The error asks
+   the developer to choose a supported combination, so it may as well say where
+   the menu is: `"details": {"supported_regions_url": "…"}`.
+3. **Expose it as `GET /v1/regions`.** A published table cannot be checked by a
+   preflight command; an endpoint can. That is where this check belongs, because
+   the frontier here grows from numbers given on calls — we cannot know in
+   advance which countries a run will reach.
+
+Worth saying plainly: the table itself is good. It distinguishes Local from
+International lines and notes that International numbers are "primarily intended
+for testing", which is exactly the kind of operational detail that usually has to
+be discovered the hard way.
 
 The 422-before-dial behaviour is genuinely good, incidentally: we spent no
-credits discovering any of this. The gap is only that it is undiscoverable in
-advance.
+credits discovering any of this.
+
+One practical note for anyone in the Gulf reading this later: **UAE, Saudi Arabia
+and Oman are all on the supported list** — UAE with a Local line, in English and
+Arabic. Bahrain is not. Had we found the table, the obvious workaround would have
+been a neighbouring-country number rather than a US one.
 
 ---
 

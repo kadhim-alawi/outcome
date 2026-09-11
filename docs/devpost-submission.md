@@ -33,13 +33,22 @@ An AI that can make a phone call does not fix it. An AI that can decide **which
 call to make next** does.
 
 That framing is also what steered us away from the obvious build. Before writing
-any code we read every entry in `awesome-phone-call-agents` — at the time 40
-skills and 75 apps — and found the space genuinely crowded. `callsweep` already
-compares quotes across vendors against a budget. `priority-call-waterfall`
-already calls a ranked list until someone accepts. What nothing did was **grow
-its own call list mid-run**, because their candidates come from a database or a
-map query. Ours cannot: "who can replace order BK-7741" is not a query you can
-run. You have to ask someone.
+any code we read every entry in `awesome-phone-call-agents`, and checked it again
+on 11 September, by which point it held **66 skills, 126 apps and 5 plugins**. The
+space is crowded and the neighbours are good: `callsweep` compares quotes across
+vendors against a budget, `priority-call-waterfall` calls a ranked list until
+someone accepts, `procurecall-supplier-sourcing` qualifies suppliers and returns a
+comparison for approval.
+
+Every one of them starts from a list. `partline-part-sourcing` makes the
+assumption explicit — it calls *"approved suppliers"*, and instructs the agent to
+*"never include another supplier's name, quote or inventory in a call"*, which for
+procurement compliance is exactly right.
+
+What nothing does is **grow its own call list mid-run**, because their candidates
+come from a database, an approved-vendor table, or a map query. Ours cannot: "who
+can replace order BK-7741" is not a query you can run. You have to ask someone,
+and then ask the person they name.
 
 ## What it does
 
@@ -190,10 +199,22 @@ HTTP 422 call_not_ready
 calls for that region/language combination are not currently supported."
 ```
 
-We tested both English and Arabic; the gate is the region, not the language. The
-supported set is not published anywhere in the docs, the OpenAPI schema, or the
-error body — so this is only discoverable *after* signing up, integrating, and
-making a request that fails.
+We tested both English and Arabic; the gate is the region, not the language.
+
+**And then we wrote up the wrong lesson.** Our first version of this said the
+supported set was not published anywhere. It is — a 44-country table with
+languages and line types, in the `call-e-integrations` README, which is the first
+link on the hackathon resources page. We had searched the API surface, because
+that is where an error from `POST /v1/calls` sends you, and never thought to read
+the setup guide. Bahrain is genuinely not on the list, so the 422 was right and
+the workaround was still needed — but the reason we spent a day on it was that we
+never found the answer, not that there wasn't one.
+
+What survives is much smaller and we think still fair: the 422 asks you to pick a
+supported combination without saying where the menu is, and `calls.mdx` and the
+OpenAPI schema document `region` without linking the table. One cross-reference
+would have saved the detour. (UAE, Saudi Arabia and Oman are all supported, so the
+better workaround was a neighbouring number, not a US one.)
 
 **Then we misdiagnosed the workaround.** The obvious fix is to rent a number in a
 supported region and point it somewhere we can answer, so we did: a US number on
