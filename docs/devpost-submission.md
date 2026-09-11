@@ -138,6 +138,17 @@ goal + constraints
 
 **144 tests**, no network, no credentials.
 
+**Why not CALL-E Goals?** A Goal is a published, version-pinned workflow you run
+per recipient with variables, and the run "cannot select, replace, or relax
+schemas or the materialization contract" — which is exactly right for a governed,
+repeatable call. It is a contract for *one* interaction. OUTCOME is the layer
+above: what to do once that interaction comes back, whether the answer clears the
+user's limits, and who to ring next given what was just said. The two stack
+rather than compete — the natural next version publishes each call shape as a
+Goal and keeps the planner deciding which Goal to run against whom. What we would
+not move into a Goal is the decision of who to call next, because that is the
+part that spends the user's money and it belongs in code a person can read.
+
 ## Safety
 
 Phone calls are real-world side effects, so four guards sit between the planner

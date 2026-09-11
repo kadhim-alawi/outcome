@@ -24,6 +24,31 @@ for the click.
 The single job of this video: make the viewer notice that **two of the three
 companies on screen were never typed in by the user.**
 
+## Who is watching
+
+The judging panel is now named, and it is four people from AI Rudder: the CEO,
+the Chief Marketing & Revenue Officer, the Head of GTM, and CALL-E's Product
+Manager. **Three of the four are commercial roles. None is an engineer.**
+
+That should change the narration, not the shot list. Nobody on this panel is
+going to open `store.py` and admire the write-ahead ledger. They will decide from
+what they see and hear in under three minutes.
+
+So lead with the problem and the money, and let the engineering show itself:
+
+- **Say the cost in human terms**, once, early. "Three companies, and a person on
+  hold between each one" lands harder than any architecture.
+- **Name who this is for.** An operations person at a company that ships things.
+  A one-line answer to "who would pay for this" is worth more than a diagram.
+- **Let the rejected quote do the technical argument.** $612 turned down against
+  a $500 limit shows deterministic constraint checking without the words
+  "deterministic constraint checking".
+- **The approval card is the commercial reassurance**, not just a safety feature.
+  A CMO hears "the agent cannot commit my company without a human saying yes."
+- **Do not explain the transports, the schema, or the ledger.** They are in the
+  repo and the write-up for whoever wants them.
+
+
 ---
 
 ## 0:00 — 0:18 · The problem
