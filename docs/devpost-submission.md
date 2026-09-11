@@ -270,6 +270,139 @@ would have been rehearsing something that cannot happen.
 
 ---
 
+# The "Additional info" step
+
+Step 4 of 5 on Devpost. Judges and organisers see this; the public project page
+does not.
+
+| Field | Answer |
+|---|---|
+| Submitter Type | **Individual** |
+| Country of residence/incorporation | **Bahrain** |
+| Organization name | *blank* |
+| App status | **Newly created** |
+| Optional demo URL | *blank* — see below |
+| Project submission pull request URL | `https://github.com/CALLE-AI/awesome-phone-call-agents/pull/369` |
+| Email associated with your CALL-E account | **[TBD — same address as the link above]** |
+| Primary use case | **Order / exception follow-up** |
+| The three eligibility checkboxes | all three ticked |
+
+**App status is "Newly created".** First commit is `01d5880`, dated 5 September
+2026 — inside the submission period, and the repository was empty before it.
+
+**Primary use case.** The demo is a damaged delivery on order BK-7741 chased to
+a replacement, which is that category exactly. *Service coordination & dispatch*
+is the near miss, but the agent is not coordinating a known provider — it is
+working out who can help at all. The form says this field does not affect
+judging, so the honest answer is the right one.
+
+**Leave the optional demo URL blank.** The demo is a local server with no auth
+and no persistence. Publishing it means standing up something neither hardened
+nor multi-tenant, and the testing instructions below get a judge to the same
+screen in about two minutes. An empty optional field costs nothing; a public URL
+that is down when a judge clicks it costs a lot.
+
+## "If pre-existing, explain what you updated during the submission period."
+
+Required even though it does not apply, so it needs a line rather than a blank:
+
+> Not applicable — newly created. The repository was empty before this
+> hackathon; its first commit is dated 5 September 2026, inside the submission
+> period, and the full history is public at
+> https://github.com/kadhim-alawi/outcome/commits/main
+
+## Testing instructions for application
+
+```
+No dependencies, no credential, and nothing dials a phone unless you pass --live.
+
+    git clone https://github.com/kadhim-alawi/outcome
+    cd outcome
+    python3 -m unittest discover -s tests     # 137 tests, no network, no key
+    python3 -m outcome.server                 # then open http://127.0.0.1:8765
+
+Windows only: run `pip install tzdata` first. Windows ships no IANA timezone
+database, and the calling window has nothing to resolve against without it. It is
+the only thing this project needs beyond the standard library.
+
+IN THE BROWSER — about two minutes:
+
+ 1. The supplier scenario is already loaded. Click "Read the requirements out of
+    this". The goal sentence is parsed into rules: at or under USD 500, resolved
+    on or before 11 September. Both are marked "must".
+
+ 2. Look at "Who to call first". It is one phone number. That is the entire
+    input.
+
+ 3. Click Start. Five calls run. Watch for two rows labelled "New lead" —
+    Northgate Distribution, then Brightwater Depot. Neither was given to the
+    agent. Both came out of a conversation with somebody it was already talking
+    to. This is the behaviour the project exists to demonstrate.
+
+ 4. Call 3 completes successfully and is still rejected: USD 612 is USD 112 over
+    the limit. Call status and constraint verdict are deliberately separate — a
+    helpful person who quotes too much is a failed outcome, and the agent keeps
+    working.
+
+ 5. The run stops at an approval card. Nothing before this point could commit
+    you; those calls were only allowed to ask. Click Approve and the final call
+    accepts the exact terms shown on the card.
+
+Add ?pace=5000 to slow the timeline down for reading:
+http://127.0.0.1:8765/?pace=5000
+
+THE SAME ENGINE FROM A TERMINAL:
+
+    python3 -m outcome.cli run scenarios/supplier-replacement.json
+    python3 -m outcome.cli run scenarios/bill-dispute.json
+
+The second is a different outcome shape — a disputed mobile bill, resolved by
+climbing an escalation chain inside one company against a minimum rather than a
+budget. It needed one new constraint kind and no changes to the engine.
+
+GOING LIVE:
+
+    export CALLE_API_KEY=...
+    export CALLE_ALLOWED_NUMBERS=+1...     # every number the agent may dial
+    python3 -m outcome.cli preflight       # credential, schema, window, allowlist, budget
+    python3 -m outcome.cli run scenarios/<file>.json --live
+
+Three transports sit behind one protocol — live CALL-E, dry-run, and scenario
+replay — and the engine cannot tell which it is talking to. The run you watch
+offline is the run that happens on the phone.
+
+WHY THE DEMO IS NOT LIVE:
+
+CALL-E does not currently place calls to Bahrain, where I am:
+
+    HTTP 422 call_not_ready
+    "The recipient number appears to be in Bahrain (BH), with Arabic requested,
+     but calls for that region/language combination are not currently supported."
+
+Tested in both English and Arabic — the gate is the region, not the language.
+Renting a US number and forwarding it hit a second wall unrelated to CALL-E
+(unpaid VoIP tiers accept inbound only from a single verified number, which
+CALL-E's outbound numbers can never be).
+
+Every refusal happened before the dial, so none of it cost a credit. The exact
+requests and errors are in docs/calle-api-notes.md.
+```
+
+## In one sentence, what real-world task does your CALL-E application handle?
+
+> Resolving a stuck order or service problem end to end over the phone — chasing
+> a damaged delivery to a replacement that meets a hard budget and deadline —
+> when you start out knowing only one number to call and have to discover the
+> rest by asking the people you reach.
+
+Shorter, if the field feels cramped:
+
+> Chasing a stuck order to a resolution that meets a hard budget and deadline,
+> starting from one phone number and finding the rest of the companies to call
+> by asking the people it reaches.
+
+---
+
 ## Notes before submitting — delete this section
 
 1. **Video.** Record the mock run: it is deterministic and does not burn credits
