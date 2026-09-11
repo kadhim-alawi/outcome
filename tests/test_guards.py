@@ -227,5 +227,36 @@ class LivePreconditions(unittest.TestCase):
         self.assertEqual(self.cli._check_live_preconditions(outcome, client), [])
 
 
+class ALiveRunNeedsALedger(unittest.TestCase):
+    """A live run without --store can place a call and lose its id. CALL-E has
+    no endpoint that lists calls, so nothing can ask what was just dialled —
+    which happened to us on the first call that connected, and cost us the
+    transcript. The write-ahead ledger is a safety feature, so it is a poor
+    thing to opt in to."""
+
+    def _run(self, argv):
+        import contextlib
+        import io
+        import os
+        from unittest import mock
+
+        from outcome import cli
+
+        env = {"CALLE_API_KEY": "k", "CALLE_ALLOWED_NUMBERS": "+15550100001"}
+        with mock.patch.dict(os.environ, env), contextlib.redirect_stdout(io.StringIO()):
+            return cli.main(argv)
+
+    def test_live_without_store_refuses_and_says_what_to_pass(self):
+        with self.assertRaises(SystemExit) as caught:
+            self._run(["run", SCENARIO, "--live"])
+        message = str(caught.exception)
+        self.assertIn("--store", message)
+        self.assertIn("no endpoint that lists calls", message)
+
+    def test_a_replay_run_still_needs_no_store(self):
+        """Only a live run can lose a real call. The mock cannot."""
+        self.assertEqual(self._run(["run", SCENARIO, "--approve", "auto"]), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

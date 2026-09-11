@@ -441,6 +441,19 @@ def cmd_run(args: argparse.Namespace) -> int:
     transport = _transport(args, scenario)
     if args.live:
         problems = _check_live_preconditions(outcome, transport)
+        if not args.store:
+            # Without a ledger a live run can place a call and then lose its id,
+            # and CALL-E has no endpoint that lists calls — so there is no way to
+            # ask what you just dialled. We learned this the expensive way: a
+            # real conversation whose transcript and result we could not read
+            # back afterwards. The whole point of the write-ahead ledger is that
+            # a call is never unrecorded, which makes it a poor thing to opt in
+            # to.
+            problems.append(
+                "A live run needs --store, or a call can be placed and its id lost. "
+                "CALL-E has no endpoint that lists calls, so an unrecorded call "
+                "cannot be looked up afterwards. Try --store runs.sqlite3"
+            )
         if problems:
             raise SystemExit(
                 "Refusing to start a live run:\n\n  - " + "\n  - ".join(problems)

@@ -127,7 +127,7 @@ goal + constraints
   so the engine cannot tell which it is talking to. The run you rehearse offline
   is the run that happens on the phone.
 
-**142 tests**, no network, no credentials.
+**144 tests**, no network, no credentials.
 
 ## Safety
 
@@ -330,7 +330,7 @@ No dependencies, no credential, and nothing dials a phone unless you pass --live
 
     git clone https://github.com/kadhim-alawi/outcome
     cd outcome
-    python3 -m unittest discover -s tests     # 142 tests, no network, no key
+    python3 -m unittest discover -s tests     # 144 tests, no network, no key
     python3 -m outcome.server                 # then open http://127.0.0.1:8765
 
 Windows only: run `pip install tzdata` first. Windows ships no IANA timezone
@@ -377,7 +377,7 @@ GOING LIVE:
     export CALLE_API_KEY=...
     export CALLE_ALLOWED_NUMBERS=+1...     # every number the agent may dial
     python3 -m outcome.cli preflight       # credential, schema, window, allowlist, budget
-    python3 -m outcome.cli run scenarios/<file>.json --live
+    python3 -m outcome.cli run scenarios/<file>.json --live --store runs.sqlite3
 
 Three transports sit behind one protocol — live CALL-E, dry-run, and scenario
 replay — and the engine cannot tell which it is talking to. The run you watch
