@@ -386,10 +386,12 @@ Three independent blockers, none of them a defect in this project.
     tiers document, inbound limited to calls from your one verified number, and
     CALL-E dials from its own.
 
- 3. That one attempt then stuck the account. The call finished as NO ANSWER but
-    never released its concurrency slot, and every request since has been
-    refused with HTTP 429 account_concurrency_exceeded. There is no cancel
-    endpoint, so it cannot be cleared from this side.
+ 3. That one attempt then locked the account for two and a half hours. The call
+    finished as NO ANSWER at 18:54:00Z, but kept re-emitting that same terminal
+    event every two minutes — 502 times — until 21:29:49Z, and did not release
+    its concurrency slot until it stopped. Every request in between was refused
+    with HTTP 429 account_concurrency_exceeded. There is no cancel endpoint, so
+    the only option is to wait it out.
 
 Blockers 1 and 2 cost no credits — both refusals happen before the dial. The
 exact requests, errors and the event trace behind blocker 3 are in

@@ -110,7 +110,7 @@ API would mean every integrator does not have to.
 
 ---
 
-## 4. A failed call never releases its concurrency slot
+## 4. A failed call holds its concurrency slot for two and a half hours
 
 **Severity: blocking, and we believe this is a backend bug rather than a
 documentation gap.**
@@ -141,7 +141,7 @@ credits, and every subsequent `POST /v1/calls` was refused with the 429 above.
 ### What is actually happening
 
 `GET /v1/calls/{call_id}/events` shows it. The call reaches its terminal state
-once and then **re-enters it, over and over, indefinitely:**
+once and then **re-enters it, over and over, for the next two and a half hours:**
 
 ```
 18:52:22Z  call.started      run_call started.
@@ -155,35 +155,44 @@ once and then **re-enters it, over and over, indefinitely:**
 18:58:19Z  call.updated      calling task status=NO ANSWER
 18:58:20Z  call.failed       calling task completed with status=NO ANSWER   ← again
    …
-20:35:21Z  call.failed       calling task completed with status=NO ANSWER   ← still going
+21:29:49Z  call.failed       calling task completed with status=NO ANSWER   ← last one
 ```
 
 The call reached `NO ANSWER` at 18:53:48Z and emitted `call.failed` at
-18:54:00Z. **One hour and forty-one minutes later it was still emitting the same
-pair every two minutes**, and was still doing so when we stopped counting:
+18:54:00Z. It then re-emitted that same pair every two minutes for the next two
+and a half hours before stopping on its own:
 
 | | |
 |---|---|
-| Events on the call | 184 |
-| `call.failed` events | **88** |
-| `call.updated` events | 92 |
+| Events on the call | 1003 |
+| `call.failed` events | **502** |
 | First event | `2026-09-10T18:52:22Z` |
-| Last event | `2026-09-10T20:35:21Z` |
-| Duration past terminal | **1 h 41 m and counting** |
+| First terminal event | `2026-09-10T18:54:00Z` |
+| Last event | `2026-09-10T21:29:49Z` |
+| **Time the slot stayed held past completion** | **2 h 35 m 49 s** |
 
-So the worker that syncs the result from the underlying calling provider never
-stops re-syncing a call that is already finished. The read API reports the call
-as `failed`, but the task is evidently still live internally — which is exactly
-what the concurrency accounting is counting. **The slot is held by a call that
-every developer-visible surface says is over.**
+So the worker that syncs the result from the underlying calling provider keeps
+re-syncing a call that is already finished, 502 times, and the slot is not
+released until it finally gives up. The read API reports the call as `failed`
+throughout, but the task is evidently still live internally — which is what the
+concurrency accounting is counting. **For two and a half hours the slot is held
+by a call that every developer-visible surface says is over.**
 
-The practical effect on a one-slot account is total: a single unanswered call
-permanently disables the API. Nothing the developer can do releases it, because
-there is no cancel endpoint.
+The practical effect on a one-slot account: **one unanswered call locks the API
+for the next two and a half hours.** Nothing the developer can do shortens that,
+because there is no cancel endpoint. On a hackathon deadline, where a first live
+run very often goes unanswered while you are still getting the recipient set up,
+that is the difference between five attempts in an evening and two.
 
 **Reproduction:** place a call to a number that does not answer, wait for
 `status: failed`, then poll `GET /v1/calls/{call_id}/events`. If `call.failed`
-appears more than once, the slot is stuck.
+appears more than once, the slot is still held; it clears roughly two and a half
+hours after the call completed.
+
+**A correction to an earlier version of this note.** We first wrote this up
+while the loop was still running and described the slot as never released. It
+does release — after 2 h 36 m. The bug is the duration and the 502 duplicate
+terminal events, not a permanent leak.
 
 **Suggested fixes, in order of importance:**
 
