@@ -220,10 +220,23 @@ Isolating the real cause then ran into the concurrency bug above: the unanswered
 call held CALL-E's single slot for two and a half hours, so every attempt cost an
 afternoon rather than a credit.
 
-So the honest state at submission: **CALL-E does not serve our region** — real,
-verified, and the reason a workaround was needed at all. The number rented to work
-around it has not yet carried a CALL-E call, for a reason still being isolated.
-**[TBD: update once the controlled retest has run.]**
+The real cause was the dullest one available. The softphone was not reachable at
+the moment CALL-E dialled — which is what SIP 408 *Request Timeout* means, and
+what it had been saying all along. A policy refusal returns 403 or 603. We read a
+timeout as a rejection because we had a rejection in mind.
+
+**With the softphone confirmed live, it worked on the first attempt.** Two real
+calls, a real conversation, and a resolved outcome — the transcripts and the
+structured result CALL-E returned for each are in
+[`docs/live-call-evidence.md`](live-call-evidence.md).
+
+**And then it reported the call as unanswered.** A last bug, and ours: CALL-E
+returns `status: failed` both when nobody picks up and when somebody does but the
+objective is not met. We had collapsed the two into `no_answer` — which threw away
+a conversation that happened, and worse, `no_answer` is retryable, so the planner
+would have rung a person back two minutes after they finished explaining
+themselves. A transcript now outranks a failed status. That is the same guarantee
+`store.py` was written for, arriving through a door we had not thought to watch.
 
 One refusal in all of this actually dialled; every other one happened **before**
 the dial and cost no CALL-E credit. That behaviour is genuinely good API design,
@@ -279,6 +292,9 @@ would have been rehearsing something that cannot happen.
 - **CALL-E account email:** **[TBD — the address on your CALL-E account]**
 - **API notes:** [`docs/calle-api-notes.md`](calle-api-notes.md) — the schema and
   region constraints we hit, with the exact requests and errors.
+- **Live call evidence:** [`docs/live-call-evidence.md`](live-call-evidence.md) —
+  transcripts and the structured result CALL-E returned for the two real calls
+  that resolved a goal on 11 September.
 
 ---
 
@@ -383,29 +399,23 @@ Three transports sit behind one protocol — live CALL-E, dry-run, and scenario
 replay — and the engine cannot tell which it is talking to. The run you watch
 offline is the run that happens on the phone.
 
-WHY THE DEMO IS NOT LIVE:
+IT HAS RUN LIVE:
 
-Three independent blockers, none of them a defect in this project.
+On 11 September 2026 this resolved a goal over two real phone calls through the
+CALL-E Developer API. Transcripts and the structured result CALL-E returned for
+each call are in docs/live-call-evidence.md.
 
- 1. CALL-E does not currently place calls to my region, so it cannot ring a
-    phone I own. HTTP 422 call_not_ready, tested in both English and Arabic —
-    the gate is the region, not the language.
+    call_fRjlbGjjzn8zQGPqomoRlQ   gathering  — offer USD 380.00, 2026-09-16
+    call_qo8JGJf0NnhDEEqFcCnZ1Q   commit     — confirmed, with a reference
 
- 2. The workaround — a US number on a SIP connection, terminating at a softphone
-    — rings when I dial it myself, but the one call CALL-E made to it returned
-    SIP 408 in zero seconds and never reached the handset. Cause still being
-    isolated; see Challenges for the diagnosis we got wrong first.
+The demo above runs on the scripted transport because it is deterministic and
+costs no credits to rehearse, not because the live path is untested.
 
- 3. That one attempt then locked the account for two and a half hours. The call
-    finished as NO ANSWER at 18:54:00Z, but kept re-emitting that same terminal
-    event every two minutes — 502 times — until 21:29:49Z, and did not release
-    its concurrency slot until it stopped. Every request in between was refused
-    with HTTP 429 account_concurrency_exceeded. There is no cancel endpoint, so
-    the only option is to wait it out.
+Getting there was not straightforward, and the detail is in Challenges: CALL-E
+does not currently place calls to my region, so the recipient is a US number on
+a SIP connection that I own and answered myself. Nothing in this project has
+ever dialled a real business.
 
-Blockers 1 and 2 cost no credits — both refusals happen before the dial. The
-exact requests, errors and the event trace behind blocker 3 are in
-docs/calle-api-notes.md.
 ```
 
 ## In one sentence, what real-world task does your CALL-E application handle?
@@ -429,6 +439,7 @@ Shorter, if the field feels cramped:
    on retakes. Say plainly in the video description that it is the scripted
    transport and that `--live` runs the identical engine. Shot list is in
    [`demo-script.md`](demo-script.md).
-2. **The regional paragraph** in *Challenges* needs updating if a live call
-   succeeds before the deadline.
+2. ~~The regional paragraph in *Challenges* needs updating if a live call
+   succeeds.~~ Done — it ran live on 11 September, and *Challenges* and the
+   testing instructions both say so.
 3. Fill both **[TBD]** links above.
