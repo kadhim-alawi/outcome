@@ -195,27 +195,39 @@ supported set is not published anywhere in the docs, the OpenAPI schema, or the
 error body — so this is only discoverable *after* signing up, integrating, and
 making a request that fails.
 
-**Then the workaround hit a second wall.** The obvious fix is to rent a number in
-a supported region and forward it, so we did: a US number from a VoIP provider,
-pointed at a SIP softphone. Calls to it never arrived — and never appeared in the
-provider's own logs either, which is the tell that they were rejected at the edge
-rather than misrouted. The cause was in the provider's account-level
-documentation rather than any error message:
+**Then we misdiagnosed the workaround.** The obvious fix is to rent a number in a
+supported region and point it somewhere we can answer, so we did: a US number on
+a SIP connection, terminating at a softphone. One call cleared CALL-E's
+validation and actually dialled. The attempt record:
 
-> **Voice → Inbound: limited to receiving from the verified phone number.**
+```
+"failure_code": "408",
+"started_at":   "2026-09-10T18:53:04Z",
+"completed_at": "2026-09-10T18:53:04Z"
+```
 
-That restriction applies at both of their unpaid account tiers. CALL-E dials from
-its own numbers, which will never be a developer's single verified number, so
-inbound from CALL-E can never be accepted on an unpaid account — not as a bug, by
-design. Reaching the tier that lifts it requires a card payment.
+SIP 408 with both timestamps identical — refused in zero seconds, not rung out.
+We matched that against the telephony provider's documented restriction on unpaid
+accounts, where inbound is limited to calls from your own verified number, and
+wrote it up as a second independent blocker.
 
-So the two blockers are independent and neither is a defect in this project:
-CALL-E does not serve our region, and the cheap way around that needs a paid
-telephony account. **[TBD: update if a live call is made before submission.]**
+**It wasn't.** The account is on the paid tier, where that restriction does not
+apply. We had diagnosed a live system from its vendor's documentation instead of
+from the account itself — which is the precise failure mode this project's
+evidence model exists to prevent, committed by the people who built it.
 
-Every refusal along the way happened **before the dial**, so none of them cost a
-CALL-E credit. That behaviour is genuinely good API design, and it is the reason
-this section exists instead of a bill.
+Isolating the real cause then ran into the concurrency bug above: the unanswered
+call held CALL-E's single slot for two and a half hours, so every attempt cost an
+afternoon rather than a credit.
+
+So the honest state at submission: **CALL-E does not serve our region** — real,
+verified, and the reason a workaround was needed at all. The number rented to work
+around it has not yet carried a CALL-E call, for a reason still being isolated.
+**[TBD: update once the controlled retest has run.]**
+
+One refusal in all of this actually dialled; every other one happened **before**
+the dial and cost no CALL-E credit. That behaviour is genuinely good API design,
+and it is the reason this section exists instead of a bill.
 
 ## Accomplishments we're proud of
 
@@ -379,12 +391,10 @@ Three independent blockers, none of them a defect in this project.
     phone I own. HTTP 422 call_not_ready, tested in both English and Arabic —
     the gate is the region, not the language.
 
- 2. The usual workaround is to rent a number in a supported region and forward
-    it, so I did: a US number pointed at a SIP softphone. It rings when I dial
-    it myself. When CALL-E dialled it, the attempt returned SIP 408 in zero
-    seconds and never reached the handset — which is what the provider's unpaid
-    tiers document, inbound limited to calls from your one verified number, and
-    CALL-E dials from its own.
+ 2. The workaround — a US number on a SIP connection, terminating at a softphone
+    — rings when I dial it myself, but the one call CALL-E made to it returned
+    SIP 408 in zero seconds and never reached the handset. Cause still being
+    isolated; see Challenges for the diagnosis we got wrong first.
 
  3. That one attempt then locked the account for two and a half hours. The call
     finished as NO ANSWER at 18:54:00Z, but kept re-emitting that same terminal
