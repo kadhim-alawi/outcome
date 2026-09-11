@@ -182,5 +182,15 @@ Last frame: the tagline. *Don't tell it who to call. Tell it what needs to happe
   npm install playwright && npx playwright install chromium
   node scripts/time_demo.mjs 5000
   ```
+- **No copyrighted music, no third-party logos.** The rules bar both. Narration
+  over silence is fine, and it is what the shot list assumes. If you record a
+  live segment, keep the telephony provider's dashboard and the softphone's
+  branding out of frame — CALL-E's own name is fine, it is the sponsor.
+- **Show one real call.** Stage One is pass/fail on whether the project
+  "reasonably applies CALL-E APIs", and *Technical Implementation* asks
+  specifically whether CALL-E is "actually called at runtime, not just
+  referenced". Fifteen seconds of the terminal showing a real `call_…` id and a
+  RESOLVED result answers that. See [`live-call-evidence.md`](live-call-evidence.md)
+  for the ids and transcripts.
 - **Check the masking.** Every number on screen must render `+*******0002`.
   Nothing in this scenario is real, but the frame is what a viewer copies.
