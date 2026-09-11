@@ -273,3 +273,78 @@ class TheContributedSkillMatchesTheCode(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AFailedCallThatSomebodyAnswered(unittest.TestCase):
+    """CALL-E reports `status: failed` for two different things: nobody picked
+    up, and somebody did but the objective was not met. Reading both as
+    `no_answer` throws away a real conversation — and `no_answer` is retryable,
+    so the planner would ring somebody who had just spent two minutes on the
+    phone explaining why they could not help.
+
+    Found on the first live call that actually connected: a full conversation
+    was reported to the operator as "Nobody answered."
+    """
+
+    def _extract(self, status, structured, transcript_turns):
+        return extract(
+            Action(type=ActionType.CALL, purpose="p", target_org_id="org_1"),
+            CallOutcome(
+                call_id="c",
+                status=status,
+                structured=structured,
+                raw={
+                    "recipients": [
+                        {"attempts": [{"transcript_turns": transcript_turns}]}
+                    ]
+                },
+            ),
+        )
+
+    def test_a_transcript_outranks_a_failed_status(self):
+        evidence = self._extract(
+            "failed",
+            {"reached": "yes", "verdict": "blocked", "blockers": ["Out of stock"]},
+            [{"speaker": "them", "text": "We're out of stock."}],
+        )
+        self.assertIs(evidence.verdict, CallVerdict.BLOCKED)
+        self.assertEqual(evidence.blockers, ["Out of stock"])
+
+    def test_an_offer_survives_a_failed_status(self):
+        evidence = self._extract(
+            "failed",
+            {
+                "reached": "yes",
+                "verdict": "offer",
+                "offer": {"what_is_offered": "50 boxes", "price": "380.00"},
+            },
+            [{"speaker": "them", "text": "Three eighty, Thursday."}],
+        )
+        self.assertIs(evidence.verdict, CallVerdict.OFFER)
+        self.assertEqual(evidence.offer.price, 380.0)
+
+    def test_no_transcript_still_means_no_answer(self):
+        """The original behaviour, which was right for the case it was written
+        for: a call the provider could not connect is not testimony."""
+        evidence = self._extract("failed", {"verdict": "offer"}, [])
+        self.assertIs(evidence.verdict, CallVerdict.NO_ANSWER)
+        self.assertEqual(evidence.blockers, ["Nobody answered."])
+
+    def test_a_conversation_with_nothing_extracted_is_partial_not_no_answer(self):
+        """Somebody picked up and the agent got nothing usable. That is a thin
+        call, not an unanswered one, and the difference decides whether the
+        planner dials them again."""
+        evidence = self._extract(
+            "failed", {}, [{"speaker": "them", "text": "Hello?"}]
+        )
+        self.assertIs(evidence.verdict, CallVerdict.PARTIAL)
+
+    def test_an_explicit_no_still_wins_over_a_transcript(self):
+        """If the agent itself recorded that it did not reach anyone, believe
+        it — a transcript can be a voicemail greeting."""
+        evidence = self._extract(
+            "failed",
+            {"reached": "no", "verdict": "partial"},
+            [{"speaker": "them", "text": "Leave a message after the tone."}],
+        )
+        self.assertIs(evidence.verdict, CallVerdict.NO_ANSWER)

@@ -60,6 +60,21 @@ def _said_no(value: Any) -> bool:
     return isinstance(value, str) and value.strip().lower() == "no"
 
 
+def _spoke_to_somebody(call: CallOutcome) -> bool:
+    """Whether a conversation actually happened.
+
+    CALL-E reports `status: failed` for two different things: nobody picked up,
+    and somebody did but the objective was not met. Only the first is grounds
+    for `no_answer`. A transcript is the evidence that separates them — if there
+    are turns, a person was on the line, whatever the status says.
+    """
+    for recipient in call.raw.get("recipients") or []:
+        for attempt in recipient.get("attempts") or []:
+            if attempt.get("transcript_turns"):
+                return True
+    return False
+
+
 def _parse_verdict(structured: dict[str, Any], call: CallOutcome) -> CallVerdict:
     raw = str(structured.get("verdict", "")).strip().lower()
     try:
@@ -67,9 +82,13 @@ def _parse_verdict(structured: dict[str, Any], call: CallOutcome) -> CallVerdict
     except ValueError:
         verdict = None
 
-    if not call.succeeded:
-        # A call the provider could not complete is never testimony, whatever
-        # the structured block claims.
+    if not call.succeeded and not _spoke_to_somebody(call):
+        # A call the provider could not connect is never testimony, whatever
+        # the structured block claims. But a call that connected and then failed
+        # to meet its objective is testimony, and reporting it as `no_answer`
+        # would be a lie about a conversation that happened — and a retryable
+        # one, so the planner would ring somebody who just spent two minutes on
+        # the phone.
         return CallVerdict.NO_ANSWER
     if _said_no(structured.get("reached")):
         return CallVerdict.NO_ANSWER

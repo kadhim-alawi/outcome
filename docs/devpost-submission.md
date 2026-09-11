@@ -127,7 +127,7 @@ goal + constraints
   so the engine cannot tell which it is talking to. The run you rehearse offline
   is the run that happens on the phone.
 
-**137 tests**, no network, no credentials.
+**142 tests**, no network, no credentials.
 
 ## Safety
 
@@ -330,7 +330,7 @@ No dependencies, no credential, and nothing dials a phone unless you pass --live
 
     git clone https://github.com/kadhim-alawi/outcome
     cd outcome
-    python3 -m unittest discover -s tests     # 137 tests, no network, no key
+    python3 -m unittest discover -s tests     # 142 tests, no network, no key
     python3 -m outcome.server                 # then open http://127.0.0.1:8765
 
 Windows only: run `pip install tzdata` first. Windows ships no IANA timezone
