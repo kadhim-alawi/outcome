@@ -76,8 +76,10 @@ OBS settings:
 | Audio | **mic AND desktop audio, on separate tracks** — you need both sides of the call |
 | Format | mp4 |
 
-Add a **Display Capture** source, and an **Audio Input Capture** for the mic.
-Check the audio meter moves when you speak and does *not* move when you don't.
+Add three sources: **Display Capture**, an **Audio Input Capture** for the mic,
+and an **Audio Output Capture** for desktop audio. Segment A needs only the mic;
+Segment B needs both, because the agent's voice arrives through desktop audio.
+Check each meter moves on its own.
 
 ### The app
 
@@ -156,10 +158,10 @@ python -m outcome.cli run scenarios/local/live-smoke-test.json \
     --live --approve auto --store runs.sqlite3
 ```
 
-Answer as the depot, exactly as in
-[`live-call-rehearsal`](#) — *"Fifty insulated shipping boxes, three hundred and
-eighty dollars. We can deliver on the sixteenth of September."* Reference
-BWD-4471 if asked. Two calls, budget 2, ends **RESOLVED**.
+Answer as the depot. Your lines are in
+[`live-call-rehearsal.md`](live-call-rehearsal.md) — *"Fifty insulated shipping
+boxes, three hundred and eighty dollars. We can deliver on the sixteenth of
+September."* Reference BWD-4471 if asked. Two calls, budget 2, ends **RESOLVED**.
 
 Costs 2 credits. Do a full take even if you fluff a line — you are cutting it
 down anyway, and a retake costs 2 more credits out of 200.
