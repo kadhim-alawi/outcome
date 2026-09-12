@@ -64,11 +64,9 @@ What still needs real audio is Segment B, the live call:
   speakers — several lines repeat what the agent just said before the human's
   reply. A headset keeps the two channels apart.
 - **Quiet room.** Your own phone on silent, face down, in another room.
-- **Your real voice appears in Segment B**, because you are the person answering
-  as the depot. Narration can be generated; a live conversation cannot.
-  [`narration.md`](narration.md) sets out the three ways to handle that — the
-  short version is to leave it in, because a human answering a phone reads as
-  authenticity rather than as presenting.
+- **No human voice anywhere.** The depot's side is generated too and played into
+  the call through a virtual audio cable. Use a *different* voice from the
+  narrator, or it reads as staged.
 
 ### The recorder
 
@@ -148,20 +146,20 @@ any terminal output.
 
 You will record roughly four minutes and cut it to under thirty seconds.
 
-**Audio setup — this is the part that goes wrong.** You need *both* sides clean:
+**Both sides are generated.** The depot's replies are pre-generated clips played
+into the line through a virtual audio cable, so no human voice appears anywhere
+in the video. Full setup, clips and rehearsal in
+[`live-call-rehearsal.md`](live-call-rehearsal.md).
 
-| Source | Captures | OBS source |
+OBS captures two outputs and **no microphone at all**:
+
+| OBS source | Device | Captures |
 |---|---|---|
-| The agent's voice | Linphone's output | **Desktop Audio** (Audio Output Capture) |
-| Your voice | you answering | **Mic** (Audio Input Capture) |
+| Audio Output Capture 1 | your headset | the agent |
+| Audio Output Capture 2 | `CABLE Input` | the depot clips |
 
-**Wear a headset.** Linphone's audio then reaches OBS digitally via Desktop
-Audio, and never reaches your microphone — so there is no echo. On speakers, your
-mic picks up the agent and both channels smear. Our own live transcript shows
-exactly that failure: several lines repeat the agent's words back before the
-human's reply.
-
-Verify both meters move independently before you dial.
+If a mic source is enabled you will record the room. Verify both meters move
+during the free rehearsal call before spending a credit.
 
 **On screen:** the terminal running the CLI. Nothing else.
 
@@ -172,10 +170,9 @@ python -m outcome.cli run scenarios/local/live-smoke-test.json \
     --live --approve auto --store runs.sqlite3
 ```
 
-Answer as the depot. Your lines are in
-[`live-call-rehearsal.md`](live-call-rehearsal.md) — *"Fifty insulated shipping
-boxes, three hundred and eighty dollars. We can deliver on the sixteenth of
-September."* Reference BWD-4471 if asked. Two calls, budget 2, ends **RESOLVED**.
+Play the depot clips as the agent asks for them — the running order is in
+[`live-call-rehearsal.md`](live-call-rehearsal.md). Two calls, budget 2, ends
+**RESOLVED**.
 
 Costs 2 credits. Do a full take even if you fluff a line — you are cutting it
 down anyway, and a retake costs 2 more credits out of 200.
@@ -186,7 +183,7 @@ down anyway, and a retake costs 2 more credits out of 200.
 |---|---|---|
 | ~4 s | `☎ Test depot (you) +*******9558` appears | ringing |
 | ~9 s | terminal holding | *"Hi, I'm an AI assistant placing this call on behalf of a customer…"* |
-| ~7 s | terminal holding | you: *"Yes, we can do that. Fifty boxes, three hundred and eighty dollars, the sixteenth of September."* |
+| ~7 s | terminal holding | the depot: *"Yes, we can do that. Fifty insulated shipping boxes, three hundred and eighty dollars…"* |
 | ~8 s | `✓ confirmed` → offer USD 380.00 → **RESOLVED** | let it land in silence |
 
 **Do not narrate over this.** The real audio *is* the argument. One line before

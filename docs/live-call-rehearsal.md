@@ -1,137 +1,159 @@
-# Live call rehearsal — you are the depot
+# The live call — playing generated audio as the depot
 
-Your lines for the live run. Two calls to your handset, with an approval in
-between, about four minutes end to end. This is what
+Your side of the call is pre-generated and played into the line, so no human
+voice appears in the video at all. This is what
 [`video-plan.md`](video-plan.md) Segment B records.
 
-You are **"Test depot"**, a supplier of insulated shipping boxes. The caller is
-an AI assistant ringing on behalf of a customer. It will say so itself, first
-thing.
+It works, but the audio routing is fiddly and the rehearsal step below is not
+optional. **Test it without CALL-E first** — that costs nothing, and discovering
+the cable is wired backwards while a paid agent waits on the line is a bad way to
+find out.
 
 ---
 
-## Call 1 — it asks, you quote
+## 1 · Route generated audio into the call
 
-### What it wants
+Install **VB-CABLE** (free, vb-audio.com/Cable). It creates a virtual device
+pair: anything played to `CABLE Input` is heard by anything listening on
+`CABLE Output`.
 
-> Can you supply **50 insulated shipping boxes**, delivered this week?
-
-Behind that, it is checking three things:
-
-| | Must be |
+| | Set to |
 |---|---|
-| Price | at or under **USD 500** |
-| Delivery | on or before **17 September** |
-| Reference number | nice to have, not required |
+| Linphone → Audio → **Capture / microphone** | `CABLE Output (VB-Audio Virtual Cable)` |
+| Linphone → Audio → **Playback** | your headset |
+| Your media player's **output device** | `CABLE Input (VB-Audio Virtual Cable)` |
 
-It is explicitly told it **may not agree to anything** on this call. If you try
-to close the deal, it should say it will confirm shortly. That is correct
-behaviour, not a failure.
+On Windows, set the player's output per-app: **Settings → System → Sound →
+Volume mixer →** pick the app **→ Output device**.
 
-### What you say
+The agent's voice now arrives in your headset. Your clips go down the line and
+you never speak.
 
-Wait for it to introduce itself and ask. Then:
+### What OBS needs to capture
 
-> "Yes, we can do that. Fifty insulated shipping boxes, three hundred and eighty
-> dollars. We can deliver on the sixteenth of September."
+Two separate outputs, or the recording will have only half the conversation:
 
-If it asks for a reference number:
+| OBS source | Device | Captures |
+|---|---|---|
+| Audio Output Capture 1 | your headset | the agent |
+| Audio Output Capture 2 | `CABLE Input` | the depot clips |
 
-> "Your reference is BWD-4471."
+Watch both meters move during the rehearsal call. **No microphone source at
+all** — if one is enabled you will record the room.
 
-Then let it wrap up and **let it hang up first**.
+## 2 · Rehearse with a free call
 
-### Why these numbers
+Before spending a single credit:
 
-- **380** is under the 500 limit → the budget constraint passes
-- **16 September** is before the 17th → the deadline constraint passes
-- Both passing is what produces an approval card instead of a rejection
+1. Ring the US number **from your own mobile**
+2. Answer in Linphone
+3. Play clip **A** from your media player
+4. Confirm you hear it **on your mobile**, and that both OBS meters moved
 
-**Say the date as a date** — "the sixteenth of September", not "Tuesday". The
-constraint check compares actual dates, and a weekday name may not resolve.
-
----
-
-## Between the calls — your bit
-
-The run stops and shows an approval card: the offer, the three checks, and what
-it would commit you to. With `--approve auto` it continues by itself, and the
-second call goes out within a few seconds.
-
-**Stay on the line mentally — the phone rings again quickly.**
+If your mobile hears silence, the capture device is wrong. If it hears your
+room, Linphone is still on the real microphone.
 
 ---
 
-## Call 2 — it accepts
+## 3 · The clips to generate
 
-### What it wants
+Same voice settings as the narration, but **a different voice**. The depot and
+the narrator being audibly the same person is the one thing that would make this
+read as staged.
 
-This is the one call in the whole run allowed to say yes, and its authority is
-written as an exact envelope:
+Keep each clip short and separate. The agent's phrasing varies between calls, so
+you are responding to what it actually asks, not playing a script in order.
 
+### A · The offer — the main one
+
+> Yes, we can do that. Fifty insulated shipping boxes, three hundred and eighty
+> dollars. We can deliver on the sixteenth of September.
+
+### B · Confirming
+
+> Yes, that's correct.
+
+### C · The reference number
+
+> Your reference is seven seven four one.
+
+### D · The commit call
+
+> That's right. Three hundred and eighty dollars, delivered on the sixteenth.
+> Your order reference is seven seven four one.
+
+### E · Two fillers, for the gaps
+
+> Hello, depot speaking.
+
+> Yes, go ahead.
+
+---
+
+## Why the reference is numeric now
+
+The first live run used `BWD-4471`. The agent heard `BWD4471` on call one and
+`DWD4471` on call two — B and D are nearly identical over a phone line, and the
+resolved outcome carried the wrong one.
+
+That was an honest artifact and it is written up in
+[`live-call-evidence.md`](live-call-evidence.md), but it is not what you want
+on screen in a three-minute video. **A numeric reference cannot drift**, so the
+recording gets a clean result and the transcript in the repository keeps the
+interesting failure.
+
+---
+
+## 4 · How the call actually goes
+
+From the two live runs we have, the flow is stable:
+
+| The agent | You play |
+|---|---|
+| *"Hi, I'm an AI assistant placing this call on behalf of a customer."* | **E** — or nothing, it continues on its own |
+| *"Could you help me check whether you can supply fifty insulated shipping boxes and deliver them by September seventeenth, for a total cost at or under five hundred US dollars?"* | **A** |
+| *"Just to confirm, that's fifty insulated shipping boxes for three hundred and eighty dollars, delivered September sixteenth."* | **B** |
+| *"Do you have a reference number for this arrangement?"* | **C** |
+| *"Thank you, I'll let the customer know and they'll confirm shortly."* | nothing — let it hang up |
+
+Then the approval passes automatically and it rings back:
+
+| The agent | You play |
+|---|---|
+| *"Can you confirm you can supply fifty insulated shipping boxes for three hundred and eighty dollars total, delivered on September sixteenth?"* | **D** |
+| *"Thank you, I have the reference number."* | nothing |
+
+**Wait for it to finish speaking before you play a clip.** It listens for a pause
+to know its turn has ended, and talking over it produces the smeared transcript
+we already have one example of.
+
+**Do not hang up first.** It needs a moment after the conversation to fill in the
+result schema.
+
+---
+
+## 5 · The command
+
+```bash
+python -m outcome.cli run scenarios/local/live-smoke-test.json \
+    --live --approve auto --store runs.sqlite3
 ```
-YOU ARE AUTHORISED TO ACCEPT EXACTLY THIS AND NOTHING ELSE:
-  50 insulated shipping boxes
-  Price: USD 380.00
-  Delivery: 2026-09-16
+
+Two calls, budget two, ends **RESOLVED**. Costs 2 credits per take out of 200,
+so take it as many times as you need — but rehearse the routing first, because
+a take that fails on audio still costs the credits.
+
+## If it goes wrong on the day
+
+The agent handles an unanswered question fine; it records what it was told and
+moves on. A run that ends `blocked` or `partial` is still a real call and still
+proves the integration — but it is not the frame you want at 2:20.
+
+If the routing fights you, stop. Fall back to
+[`video-plan.md`](video-plan.md)'s no-credit ledger shot:
+
+```bash
+python -m outcome.cli calls --store runs.sqlite3 --all
 ```
 
-It is told that if **anything** has moved — a different price, a later date, an
-added fee — it must NOT accept, and must come back to you instead.
-
-### What you say
-
-> "Yes, that's right. Three hundred and eighty dollars, delivered the sixteenth.
-> Your order reference is BWD-4471."
-
-It should confirm, thank you, and end. The run then reports **RESOLVED**.
-
----
-
-## Optional: prove the envelope holds
-
-If you want to demonstrate the safety property rather than the happy path, on
-**call 2** change the terms:
-
-> "Actually the price has gone up to six hundred dollars."
-
-The agent should **refuse to accept**, record the new terms as a fresh offer,
-and end the call politely — because 600 is over your 500 limit and it was only
-authorised for 380.
-
-That is arguably the more impressive recording. But do the clean run first, so
-you have the RESOLVED result banked.
-
----
-
-## Practical
-
-- **Answer promptly.** An unanswered call is a wasted credit and locks the
-  account for about 2h36m.
-- **Speak normally.** Don't over-enunciate; it handles ordinary speech.
-- **Short sentences beat complete ones.** It is extracting fields, not enjoying
-  prose.
-- **Don't hang up first** on call 1 — it needs a moment to fill in the result
-  schema before the line drops.
-- If it asks something you have no answer for, say so plainly. "I don't know" is
-  a legitimate answer and the schema has a place for it.
-
----
-
-## What success looks like on my side
-
-```
-▸ Call Test depot (you) — can they fix this, and if not, who can?
-  ☎  Test depot (you) +*******9558
-  ✓  offer  50 insulated shipping boxes — USD 380.00 — meets your requirements
-     ✓ at or under USD 500.00
-     ✓ on or before 2026-09-17
-▸ APPROVAL — accept USD 380.00 from Test depot (you)?
-  ✓ approved
-▸ Call Test depot (you) back to accept: 50 insulated shipping boxes at USD 380.00
-  ☎  Test depot (you) +*******9558
-  ✓  confirmed — reference BWD-4471
-
-  RESOLVED
-  2 of 2 calls used.
-```
+The video ships either way. The routing is worth thirty minutes, not three hours.

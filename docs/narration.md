@@ -163,18 +163,17 @@ move it. You are no longer trying to perform to a stopwatch.
 **Keep about half a second of silence** at the head of each clip so lines do not
 collide with the row appearing on screen.
 
-## One thing text-to-speech cannot cover
+## Both sides of the live call are generated too
 
-**Segment B contains your real voice**, because you are the person answering the
-phone as the depot. Narration can be generated; a live conversation cannot.
+Segment B has no human voice either. The depot's replies are pre-generated clips
+played into the line through a virtual audio cable, so the recording carries the
+agent's real voice and a synthetic depot, and nothing of yours.
 
-Three ways to handle that, in the order I would choose them:
+The routing, the clips and the rehearsal step are in
+[`live-call-rehearsal.md`](live-call-rehearsal.md). Two things from it that
+matter here:
 
-1. **Leave it in.** It is the demo, not narration — a human voice answering a
-   phone is the point of the segment, and a judge will read it as authenticity
-   rather than as you presenting. This is what I would do.
-2. **Cut your side.** Keep the ring, the agent's opening line, and then cut
-   straight to `✓ confirmed` and `RESOLVED`. You lose the back-and-forth but keep
-   the agent's voice, which is the part that proves the integration.
-3. **Fall back to the ledger shot** — `outcome calls --store runs.sqlite3 --all`
-   — which has no audio at all. Weakest of the three, and it costs no credits.
+- **Use a different voice for the depot.** Narrator and depot sounding like the
+  same person is the one detail that would make the whole thing read as staged.
+- **Rehearse the routing on a free call first**, ringing the number from your own
+  mobile. A take that fails on audio still costs the credits.
