@@ -55,38 +55,14 @@ room, Linphone is still on the real microphone.
 
 ---
 
-## 3 · The clips to generate
+## 3 · The clips
 
-Same voice settings as the narration, but **a different voice**. The depot and
-the narrator being audibly the same person is the one thing that would make this
-read as staged.
+**The five clips and their exact words are in
+[`video-checklist.md`](video-checklist.md), step 3**, so there is one copy and it
+is the one you work from. Use a different voice from the narrator.
 
-Keep each clip short and separate. The agent's phrasing varies between calls, so
-you are responding to what it actually asks, not playing a script in order.
-
-### A · The offer — the main one
-
-> Yes, we can do that. Fifty insulated shipping boxes, three hundred and eighty
-> dollars. We can deliver on the sixteenth of September.
-
-### B · Confirming
-
-> Yes, that's correct.
-
-### C · The reference number
-
-> Your reference is seven seven four one.
-
-### D · The commit call
-
-> That's right. Three hundred and eighty dollars, delivered on the sixteenth.
-> Your order reference is seven seven four one.
-
-### E · Two fillers, for the gaps
-
-> Hello, depot speaking.
-
-> Yes, go ahead.
+Keep them short and separate. The agent's phrasing varies between calls, so you
+are answering what it actually asks rather than playing a script in order.
 
 ---
 
