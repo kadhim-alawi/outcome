@@ -304,3 +304,17 @@ class Store:
         ).fetchall()
         entries = [self.find_call(row["idempotency_key"]) for row in rows]
         return [e for e in entries if e is not None]
+
+    def all_calls(self) -> list[LedgerEntry]:
+        """Every call the ledger has ever recorded, oldest first.
+
+        The ledger is the only record of what was dialled — CALL-E has no
+        endpoint that lists calls, so an id that is not here cannot be looked up
+        anywhere. That makes reading it back an operator need in its own right,
+        not just crash recovery.
+        """
+        rows = self._db.execute(
+            "SELECT idempotency_key FROM calls ORDER BY claimed_at"
+        ).fetchall()
+        entries = [self.find_call(row["idempotency_key"]) for row in rows]
+        return [e for e in entries if e is not None]

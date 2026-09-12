@@ -410,9 +410,26 @@ def cmd_calls(args: argparse.Namespace) -> int:
         out(f"{RED}No unfinished call with that key.{RESET}")
         return 1
 
+    if args.all:
+        entries = store.all_calls()
+        if not entries:
+            out(f"{DIM}The ledger is empty. Nothing has been dialled.{RESET}")
+            return 0
+        out(f"\n{BOLD}  {len(entries)} call(s) in the ledger{RESET}")
+        out(f"  {DIM}CALL-E has no endpoint that lists calls, so this is the only "
+            f"record of what was dialled.{RESET}\n")
+        for entry in entries:
+            tick = f"{GREEN}OK{RESET}" if entry.status == "completed" else f"{YELLOW}{entry.status}{RESET}"
+            out(f"  {tick}  {BOLD}{entry.call_id or '(never created)'}{RESET}")
+            out(f"      {mask_phone(entry.phone)}  {DIM}{entry.claimed_at}"
+                f"{' -> ' + entry.completed_at if entry.completed_at else ' (unfinished)'}{RESET}")
+        out("")
+        return 0
+
     unfinished = store.unfinished_calls()
     if not unfinished:
-        out(f"{GREEN}No unfinished calls.{RESET} Nothing was left mid-flight.")
+        out(f"{GREEN}No unfinished calls.{RESET} Nothing was left mid-flight. "
+            f"{DIM}Use --all to list every call on record.{RESET}")
         return 0
 
     out(f"\n{YELLOW}{BOLD}  {len(unfinished)} unfinished call(s){RESET}")
@@ -522,6 +539,11 @@ def main(argv: list[str] | None = None) -> int:
         "calls", help="Inspect the call ledger and clear calls left unfinished by a crash."
     )
     calls.add_argument("--store", required=True, metavar="PATH")
+    calls.add_argument(
+        "--all",
+        action="store_true",
+        help="List every call the ledger has recorded, not only unfinished ones.",
+    )
     calls.add_argument("--resolve", metavar="KEY", help="The call did happen.")
     calls.add_argument("--forget", metavar="KEY", help="The call never happened.")
     calls.add_argument("--no-colour", action="store_true")

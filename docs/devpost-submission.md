@@ -136,7 +136,7 @@ goal + constraints
   so the engine cannot tell which it is talking to. The run you rehearse offline
   is the run that happens on the phone.
 
-**144 tests**, no network, no credentials.
+**147 tests**, no network, no credentials.
 
 **Why not CALL-E Goals?** A Goal is a published, version-pinned workflow you run
 per recipient with variables, and the run "cannot select, replace, or relax
@@ -378,7 +378,7 @@ No dependencies, no credential, and nothing dials a phone unless you pass --live
 
     git clone https://github.com/kadhim-alawi/outcome
     cd outcome
-    python3 -m unittest discover -s tests     # 144 tests, no network, no key
+    python3 -m unittest discover -s tests     # 147 tests, no network, no key
     python3 -m outcome.server                 # then open http://127.0.0.1:8765
 
 Windows only: run `pip install tzdata` first. Windows ships no IANA timezone

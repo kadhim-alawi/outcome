@@ -219,3 +219,38 @@ class ReplayingACompletedCall(StoreTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReadingTheLedgerBack(StoreTestCase):
+    """The ledger is the only record of what was dialled.
+
+    CALL-E has no endpoint that lists calls — GET /v1/calls returns 405 — so a
+    call id that is not here cannot be looked up anywhere. We learned that by
+    placing a real call without a ledger and losing its id permanently. Reading
+    the ledger back is therefore an operator need in its own right, not only
+    crash recovery.
+    """
+
+    def test_all_calls_returns_finished_ones_too(self):
+        scenario, outcome = load_scenario(SCENARIO)
+        store = self.open_store()
+        engine = Engine(MockCalleClient(scenario), store=store)
+        engine.run(outcome)
+        engine.approve(outcome, outcome.pending_approval_action_id)
+
+        every = store.all_calls()
+        self.assertEqual(len(every), 5)
+        self.assertTrue(all(e.finished for e in every))
+        self.assertEqual(store.unfinished_calls(), [])
+
+    def test_all_calls_is_ordered_oldest_first(self):
+        scenario, outcome = load_scenario(SCENARIO)
+        store = self.open_store()
+        engine = Engine(MockCalleClient(scenario), store=store)
+        engine.run(outcome)
+
+        claimed = [e.claimed_at for e in store.all_calls()]
+        self.assertEqual(claimed, sorted(claimed))
+
+    def test_an_empty_ledger_is_not_an_error(self):
+        self.assertEqual(self.open_store().all_calls(), [])
