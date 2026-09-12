@@ -52,14 +52,23 @@ the problem and the cost; let the code speak through what it does on screen.
 
 ### Audio
 
-- **Wear a headset.** Not laptop speakers. This is not aesthetic advice — the
-  live call transcript shows the agent's own voice echoing back into the mic,
-  because the softphone was on speakers. The same will happen to your narration.
-- **Quiet room, hard surfaces covered.** Phone on silent, face down, in another
-  room.
-- **Record a 10-second test and listen back on headphones** before the real take.
-  Levels, plosives, room hum. This is the single most common thing that ruins an
-  otherwise good hackathon video.
+**Narration is generated, not spoken** — the script and voice settings are in
+[`narration.md`](narration.md). That removes microphone setup, room noise and
+performance retakes from Segment A entirely, and lets you fit the voice to the
+picture afterwards rather than performing to a stopwatch.
+
+What still needs real audio is Segment B, the live call:
+
+- **Wear a headset.** Not laptop speakers. The live call transcript shows the
+  agent's own voice echoing back into the mic because the softphone was on
+  speakers — several lines repeat what the agent just said before the human's
+  reply. A headset keeps the two channels apart.
+- **Quiet room.** Your own phone on silent, face down, in another room.
+- **Your real voice appears in Segment B**, because you are the person answering
+  as the depot. Narration can be generated; a live conversation cannot.
+  [`narration.md`](narration.md) sets out the three ways to handle that — the
+  short version is to leave it in, because a human answering a phone reads as
+  authenticity rather than as presenting.
 
 ### The recorder
 
@@ -102,11 +111,15 @@ Verify before recording:
 Do not attempt a single continuous take. Record two segments and join them. The
 join is invisible and each segment becomes retakeable on its own.
 
-### Segment A — the browser run (about 2:25)
+### Segment A — the browser run (about 2:20), recorded SILENT
 
-Narrate live while you drive. Follow the beat table in
-[`demo-script.md`](demo-script.md); every timing there is measured from an
-instrumented run, not estimated.
+No microphone. Drive the UI, let it run, record the picture only — then lay the
+generated narration over it in the editor. Take it as many times as you like; a
+silent take costs nothing but disk.
+
+The beats are in [`demo-script.md`](demo-script.md) and the words in
+[`narration.md`](narration.md). Every timing is measured from an instrumented
+run, not estimated.
 
 The measured facts you are working against:
 
@@ -124,7 +137,8 @@ clock is your own.
 **Hold three seconds on "Who to call first"** before clicking Start. One phone
 number. That hold is what makes the two `New lead` rows land later.
 
-**Stop talking when the approval card appears.** Let it sit.
+**Pause on the approval card.** Give it a beat longer than feels natural — clip
+10 is fifteen seconds and a viewer needs to read the card underneath it.
 
 ### Segment B — a real call, with its real audio (about 28 s in the cut)
 
@@ -227,6 +241,9 @@ You need almost no editing, and every effect you add is a risk.
 - **Trim dead air** at the head and tail of each segment.
 - **No music.** The rules bar copyrighted audio, and narration over silence is
   the norm for this format. Silence over a moving timeline reads as confidence.
+- **Leave gaps between narration clips.** The script is about two minutes of
+  speech across a two-fifty-six video. That is deliberate — wall-to-wall
+  voiceover is what makes a demo feel like an advert.
 - **No zooms, no callout arrows, no kinetic text.** At 110–125% browser zoom
   everything is already legible.
 - **One title card at the end**, 3 seconds, holding the tagline:
@@ -319,17 +336,18 @@ Then:
 
 | | |
 |---|---|
-| 1 | OBS installed, audio test recorded and listened back |
-| 2 | One full rehearsal of Segment A, not recorded — just to feel the pacing |
-| 3 | Record Segment A. Expect 2–4 takes |
+| 1 | OBS installed. Display Capture working, desktop audio metering |
+| 2 | Generate the fifteen narration clips, listen to each once for figures and names |
+| 3 | Record Segment A, silent. Retakes are free |
 | 4 | Record Segment B — the live call. Check both audio meters first |
-| 5 | Join, trim, caption |
+| 5 | Lay the narration clips over Segment A, then join, trim, caption |
 | 6 | Rules checklist |
 | 7 | Export, upload **Public**, verify in a private window |
 | 8 | Paste the URL into Devpost and into the submission doc |
 | 9 | Submit — do not leave it as a draft |
 
-Budget about three hours. Most of it is takes 2–4 of Segment A.
+Budget about three hours. Generated narration takes most of the performance risk
+out, so the time now goes on the edit rather than on retakes.
 
 **Submission closes 14 September, 11:45pm SGT — 18:45 in Bahrain.** Devpost
 drafts do not submit themselves.
