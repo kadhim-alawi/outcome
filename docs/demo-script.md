@@ -2,6 +2,10 @@
 
 Hard limit is 2:59.
 
+**This is the narration — what to say and when.** Setup, recording, editing and
+publishing are in [`video-plan.md`](video-plan.md), including the revised
+timeline that fits the live-proof segment at 2:24.
+
 **Record at `http://127.0.0.1:8765/?pace=5000`.** The default 900ms feels right
 when you are driving the UI yourself and is far too fast to narrate over — the
 whole run lands in 14.7 seconds, so you would be talking over a finished screen.
