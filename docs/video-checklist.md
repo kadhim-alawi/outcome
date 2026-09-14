@@ -201,39 +201,39 @@ credits.
 - [x] Add another **Audio Output Capture** → pick `CABLE Input`. Rename it
       "depot"
 - [x] If there's a **Mic/Aux** source in the list, delete it. You don't want one.
-- [ ] Settings → Video → set both resolutions to 1920x1080, FPS 30
-- [ ] Settings → Output → Recording format **mp4**
-- [ ] Do the test call from Step 5 again, and watch both audio meters move
+- [x] Settings → Video → set both resolutions to 1920x1080, FPS 30
+- [x] Settings → Output → Recording format **mp4**
+- [x] Do the test call from Step 5 again, and watch both audio meters move
 
 ---
 
 # Step 7 — Record the real phone call (30 min)
 
-- [ ] Press `Win+N` and turn on Do Not Disturb
-- [ ] Close every window you wouldn't show a stranger
-- [ ] Open a terminal. Make the font big — 16pt or more
-- [ ] **Load your CALL-E key into this window.** Paste this and press Enter. It
+- [x] Press `Win+N` and turn on Do Not Disturb
+- [x] Close every window you wouldn't show a stranger
+- [x] Open a terminal. Make the font big — 16pt or more
+- [x] **Load your CALL-E key into this window.** Paste this and press Enter. It
       reads your `.env` file and does not print anything:
 
 ```
 Get-Content .env | ForEach-Object { if ($_ -notmatch '^\s*#' -and $_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$') { Set-Item -Path "env:$($matches[1])" -Value $matches[2] } }
 ```
 
-- [ ] Check it worked:
+- [x] Check it worked:
 
 ```
 if ($env:CALLE_API_KEY) { "key loaded" } else { "NOT loaded" }
 ```
 
-- [ ] Type `cls` to clear the screen
+- [x] Type `cls` to clear the screen
 
       **Do all of that BEFORE you start recording.** Your API key must never
       appear on screen in a public video. Stay in this same window for the whole
       take — a new window loses the key.
 
-- [ ] Have `A.mp3` to `E.mp3` open and ready to click
-- [ ] Press **Start Recording** in OBS
-- [ ] Run this:
+- [x] Have `A.mp3` to `E.mp3` open and ready to click
+- [x] Press **Start Recording** in OBS
+- [x] Run this:
 
 ```
 python -m outcome.cli run scenarios/local/live-smoke-test.json --live --approve auto --store runs.sqlite3
@@ -295,11 +295,17 @@ Now do this, slowly:
       real):
 
 ```
-Get a replacement pallet of 500 insulated shipping boxes for the crushed delivery on order BK-7741.
+Get a replacement pallet of 500 insulated shipping boxes for the crushed delivery on order BK-7741. Must be under $500 and delivered before Friday.
 ```
 
-- [ ] Click **Read the requirements out of this**. The requirement rows fill
-      themselves in.
+- [ ] Click **Read the requirements out of this**. Two rows fill themselves in:
+      `budget · Total cost at or under USD 500.00 · must` and
+      `deadline · Resolved on or before 2026-09-18 · must`
+
+      The price and the date have to be **in the sentence you type** — the
+      parser reads that text and nothing else. A bare goal with no figures
+      gives "Nothing in that sentence reads as a requirement", and a date in
+      the past is discarded.
 - [ ] Scroll down one line to **Who to call first**
 - [ ] **Stop. Count to three.** There's one company in that list. This pause is
       what makes the rest of the video work.

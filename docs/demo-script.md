@@ -74,11 +74,15 @@ Type into the box, do not paste. Typing reads as real; pasting reads as a
 rehearsal.
 
 > Get a replacement pallet of 500 insulated shipping boxes for the crushed
-> delivery on order BK-7741.
+> delivery on order BK-7741. Must be under $500 and delivered before Friday.
 
 Click **Read the requirements out of this**. The requirement rows fill
-themselves in — `budget · Total cost at or under USD 500 · must`, and
-`deadline · Resolved on or before 2026-09-11 · must`.
+themselves in — `budget · Total cost at or under USD 500.00 · must`, and
+`deadline · Resolved on or before 2026-09-18 · must`.
+
+The figures have to be in the sentence. The parser reads the text you typed and
+nothing else, so a goal with no price and no date produces no requirements, and
+a date already past is discarded.
 
 > "I'm not creating a call. I'm creating an outcome: the goal, and the rules any
 > answer has to satisfy. **Must**, not *prefer* — an answer that breaks one of
