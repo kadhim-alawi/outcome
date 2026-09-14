@@ -260,3 +260,96 @@ class ALiveRunNeedsALedger(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PollingSurvivesABlip(unittest.TestCase):
+    """A slow answer while polling is not the end of a call.
+
+    Found live, mid-recording: a socket read timeout comes up through ssl and
+    socket as a bare OSError, which is not a URLError, so it escaped every
+    handler in the client and crashed the run with a traceback — after the call
+    had already happened and the person on the other end had already hung up.
+    """
+
+    def _client(self):
+        from outcome.calle import CalleClient, parse_allowed_numbers
+
+        return CalleClient(
+            api_key="k",
+            allowed_numbers=parse_allowed_numbers("+15550100001"),
+            poll_interval=0,
+            poll_timeout=0.3,
+        )
+
+    def test_a_socket_timeout_becomes_a_calle_error(self):
+        """The conversion has to happen in _request, where urllib is. A bare
+        TimeoutError reaching the engine is a traceback, not a handled event."""
+        from unittest import mock
+
+        from outcome.calle import CalleUnavailable
+
+        client = self._client()
+        with mock.patch("urllib.request.urlopen", side_effect=TimeoutError("timed out")):
+            with self.assertRaises(CalleUnavailable):
+                client.get_call("call_1")
+
+    def test_polling_retries_through_a_blip_and_still_returns(self):
+        from outcome.calle import CallRequest, CalleUnavailable
+
+        client = self._client()
+        script = [
+            {"id": "call_1"},                                  # create
+            {"id": "call_1", "status": "in_progress"},
+            CalleUnavailable("Could not reach CALL-E: timed out"),
+            {"id": "call_1", "status": "completed", "recipients": []},
+        ]
+
+        def replay(*_args, **_kwargs):
+            item = script.pop(0)
+            if isinstance(item, Exception):
+                raise item
+            return item
+
+        client._request = replay
+        result = client.place(CallRequest(phone="+15550100001", task="hello"))
+        self.assertEqual(result.status, "completed")
+        self.assertEqual(script, [], "every scripted response should have been used")
+
+    def test_a_blip_that_never_clears_becomes_a_poll_error(self):
+        """The engine parks a run on CallePollError and tells the operator which
+        call to go and look at. It can do nothing with a traceback."""
+        from outcome.calle import CallePollError, CallRequest, CalleUnavailable
+
+        client = self._client()
+        seen = {"n": 0}
+
+        def create_then_fail(*_args, **_kwargs):
+            seen["n"] += 1
+            if seen["n"] == 1:
+                return {"id": "call_1"}
+            raise CalleUnavailable("Could not reach CALL-E: timed out")
+
+        client._request = create_then_fail
+        with self.assertRaises(CallePollError) as caught:
+            client.place(CallRequest(phone="+15550100001", task="hello"))
+        self.assertEqual(caught.exception.call_id, "call_1")
+        self.assertGreater(seen["n"], 2, "it should have retried before giving up")
+
+    def test_a_definitive_error_while_polling_does_not_retry(self):
+        """Repeating a request CALL-E has already answered for good changes
+        nothing, so it fails at once rather than burning the poll window."""
+        from outcome.calle import CalleError, CallRequest
+
+        client = self._client()
+        seen = {"n": 0}
+
+        def create_then_404(*_args, **_kwargs):
+            seen["n"] += 1
+            if seen["n"] == 1:
+                return {"id": "call_1"}
+            raise CalleError("CALL-E returned HTTP 404: not found")
+
+        client._request = create_then_404
+        with self.assertRaises(CalleError):
+            client.place(CallRequest(phone="+15550100001", task="hello"))
+        self.assertEqual(seen["n"], 2, "it should have stopped at the 404")

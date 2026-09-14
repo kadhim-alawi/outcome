@@ -70,6 +70,17 @@ class CallePollError(CalleError):
         self.call_id = call_id
 
 
+class CalleUnavailable(CalleError):
+    """CALL-E could not be reached, or answered with something transient.
+
+    A timeout, a dropped connection, or a 5xx. The distinction that matters is
+    that the request may simply be worth making again — unlike a 400 or a 404,
+    where repeating it changes nothing. A caller whose operation is safe to
+    repeat, such as polling a call that already exists, should retry rather
+    than give up on a call that is still running.
+    """
+
+
 # --------------------------------------------------------------------------
 # The evidence schema OUTCOME asks every call to fill in
 # --------------------------------------------------------------------------
@@ -429,9 +440,18 @@ class CalleClient:
                 return json.loads(response.read().decode())
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode(errors="replace")
-            raise CalleError(f"CALL-E returned HTTP {exc.code}: {detail}") from exc
+            message = f"CALL-E returned HTTP {exc.code}: {detail}"
+            # A 5xx says the request failed on their side, not that it was
+            # wrong. Repeating it is reasonable; repeating a 400 is not.
+            raise (CalleUnavailable if exc.code >= 500 else CalleError)(message) from exc
         except urllib.error.URLError as exc:
-            raise CalleError(f"Could not reach CALL-E: {exc.reason}") from exc
+            raise CalleUnavailable(f"Could not reach CALL-E: {exc.reason}") from exc
+        except (TimeoutError, OSError) as exc:
+            # A socket read timeout is not a URLError — it comes up through
+            # ssl/socket as a bare OSError and escaped every handler here,
+            # which crashed a run mid-poll with a traceback after the call had
+            # already happened.
+            raise CalleUnavailable(f"Could not reach CALL-E: {exc}") from exc
 
     def create_call(self, request: CallRequest) -> dict[str, Any]:
         return self._request(
@@ -487,15 +507,31 @@ class CalleClient:
         )
 
     def _wait(self, call_id: str) -> dict[str, Any]:
+        """Poll until the call reaches a terminal status.
+
+        A transient failure here is not a reason to abandon the call. The call
+        exists, somebody's phone is ringing or has just been put down, and
+        asking again costs nothing — so a timeout or a 5xx is treated as a
+        missed beat rather than an ending. Only the overall poll timeout ends
+        the wait, and anything CALL-E answers definitively, such as a 404 on the
+        id, still fails immediately because repeating it would not help.
+        """
         deadline = time.monotonic() + self.poll_timeout
+        last_transient: CalleError | None = None
         while True:
-            result = self.get_call(call_id)
-            if str(result.get("status", "")).lower() in TERMINAL_STATUSES:
-                return result
+            try:
+                result = self.get_call(call_id)
+            except CalleUnavailable as exc:
+                last_transient = exc
+            else:
+                last_transient = None
+                if str(result.get("status", "")).lower() in TERMINAL_STATUSES:
+                    return result
             if time.monotonic() >= deadline:
+                detail = f" Last error: {last_transient}" if last_transient else ""
                 raise CalleError(
                     f"Polling timed out for call {call_id}. The call may still be running. "
-                    "Reuse this call id rather than creating a second one."
+                    f"Reuse this call id rather than creating a second one.{detail}"
                 )
             time.sleep(self.poll_interval)
 
