@@ -320,7 +320,7 @@ would have been rehearsing something that cannot happen.
 - **Required PR:** https://github.com/CALLE-AI/awesome-phone-call-agents/pull/369
   — `outcome-completion-agent`, a reusable skill packaging the pattern rather
   than this demo, including the three CALL-E schema rules that cost us a live call.
-- **Demo video:** **[TBD]**
+- **Demo video:** https://youtu.be/oONxDGqI0Zk
 - **CALL-E account email:** **[TBD — the address on your CALL-E account]**
 - **API notes:** [`docs/calle-api-notes.md`](calle-api-notes.md) — the schema and
   region constraints we hit, with the exact requests and errors.
@@ -474,4 +474,5 @@ Shorter, if the field feels cramped:
 2. ~~The regional paragraph in *Challenges* needs updating if a live call
    succeeds.~~ Done — it ran live on 11 September, and *Challenges* and the
    testing instructions both say so.
-3. Fill both **[TBD]** links above.
+3. ~~Fill both [TBD] links above.~~ Video done; the CALL-E account
+   email is the only one left.

@@ -11,6 +11,8 @@ of the call budget you gave it.
 
 CALL-E is a tool inside this agent. It is not the agent.
 
+**[Watch the three-minute demo](https://youtu.be/oONxDGqI0Zk)**
+
 **It has run live.** On 11 September 2026 it resolved a goal over two real
 CALL-E phone calls — a gathering call that extracted an offer, both constraints
 checked, an approval, then a commit call that accepted those exact terms and came
