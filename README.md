@@ -11,6 +11,16 @@ of the call budget you gave it.
 
 CALL-E is a tool inside this agent. It is not the agent.
 
+**It has run live.** On 11 September 2026 it resolved a goal over two real
+CALL-E phone calls — a gathering call that extracted an offer, both constraints
+checked, an approval, then a commit call that accepted those exact terms and came
+back with a reference. Both transcripts and the structured result CALL-E returned
+for each are in
+[`docs/live-call-evidence.md`](docs/live-call-evidence.md).
+
+The demo below runs on a scripted transport, because it is deterministic and
+costs no credits to rehearse — not because the live path is untested.
+
 ```
      goal + constraints
              │
@@ -254,6 +264,11 @@ python3 contrib/skills/outcome-completion-agent/scripts/test_check_evidence_sche
 - [`docs/competitive-landscape.md`](docs/competitive-landscape.md) — what is
   already in `awesome-phone-call-agents`, and where this is actually different.
 - [`docs/demo-script.md`](docs/demo-script.md) — the three-minute demo, shot by shot.
+- [`docs/live-call-evidence.md`](docs/live-call-evidence.md) — transcripts and
+  structured results from the two real calls that resolved a goal.
+- [`docs/calle-api-notes.md`](docs/calle-api-notes.md) — what we hit building
+  against the CALL-E API, with the exact requests and errors, including two
+  findings we had to retract.
 
 ## Status
 
