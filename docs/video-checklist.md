@@ -105,12 +105,12 @@ CALL-E can make a phone call. This decides which phone call to make next.
 
 ## Now listen to all fourteen
 
-- [ ] Do the numbers sound right? Five hundred. Six hundred and twelve. Four
+- [x] Do the numbers sound right? Five hundred. Six hundred and twelve. Four
       hundred and thirty-eight.
-- [ ] Does `14.mp3` say **call-ee**? If it says "cally" or spells out the
+- [x] Does `14.mp3` say **call-ee**? If it says "cally" or spells out the
       letters, change the text to `Call-ee can make a phone call.` and generate
       it again.
-- [ ] Do `06.mp3` and `12.mp3` end on a downward tone? Those are your two best
+- [x] Do `06.mp3` and `12.mp3` end on a downward tone? Those are your two best
       lines. If either sounds like a question, generate it again.
 
 ---
@@ -149,7 +149,7 @@ order reference is seven seven four one.
 Hello, depot speaking.
 ```
 
-- [ ] Put all five somewhere you can click them fast. A folder on the desktop is
+- [x] Put all five somewhere you can click them fast. A folder on the desktop is
       fine.
 
 ---
@@ -158,12 +158,12 @@ Hello, depot speaking.
 
 You're going to play those clips down the phone line instead of speaking.
 
-- [ ] Put your headset on. Not speakers.
-- [ ] Open Linphone → Settings → Audio
-- [ ] Set the **microphone** to `CABLE Output (VB-Audio Virtual Cable)`
-- [ ] Set the **speaker** to your headset
-- [ ] Open Windows Settings → System → Sound → Volume mixer
-- [ ] Find whatever app plays your mp3 files, and set its **output** to
+- [x] Put your headset on. Not speakers.
+- [x] Open Linphone → Settings → Audio
+- [x] Set the **microphone** to `CABLE Output (VB-Audio Virtual Cable)`
+- [x] Set the **speaker** to your headset
+- [x] Open Windows Settings → System → Sound → Volume mixer
+- [x] Find whatever app plays your mp3 files, and set its **output** to
       `CABLE Input (VB-Audio Virtual Cable)`
 
 What this does: the agent's voice comes into your headset, and your clips go out
@@ -173,11 +173,11 @@ down the phone line. Your actual microphone is not used at all.
 
 # Step 5 — Test it without spending anything (10 min)
 
-- [ ] Ring your US number from your own mobile
-- [ ] Answer it in Linphone
-- [ ] Play `A.mp3`
-- [ ] **Can you hear it on your mobile?**
-- [ ] Hang up
+- [x] Ring your US number from your own mobile
+- [x] Answer it in Linphone
+- [x] Play `A.mp3`
+- [x] **Can you hear it on your mobile?**
+- [x] Hang up
 
 If your mobile hears the clip, you're ready.
 
@@ -191,12 +191,12 @@ credits.
 
 # Step 6 — Set up OBS (15 min)
 
-- [ ] Open OBS. In the Sources box, click **+**
-- [ ] Add **Display Capture** → pick your main screen
-- [ ] Add **Audio Output Capture** → pick your headset. Rename it "agent"
-- [ ] Add another **Audio Output Capture** → pick `CABLE Input`. Rename it
+- [x] Open OBS. In the Sources box, click **+**
+- [x] Add **Display Capture** → pick your main screen
+- [x] Add **Audio Output Capture** → pick your headset. Rename it "agent"
+- [x] Add another **Audio Output Capture** → pick `CABLE Input`. Rename it
       "depot"
-- [ ] If there's a **Mic/Aux** source in the list, delete it. You don't want one.
+- [x] If there's a **Mic/Aux** source in the list, delete it. You don't want one.
 - [ ] Settings → Video → set both resolutions to 1920x1080, FPS 30
 - [ ] Settings → Output → Recording format **mp4**
 - [ ] Do the test call from Step 5 again, and watch both audio meters move
@@ -208,7 +208,25 @@ credits.
 - [ ] Press `Win+N` and turn on Do Not Disturb
 - [ ] Close every window you wouldn't show a stranger
 - [ ] Open a terminal. Make the font big — 16pt or more
-- [ ] Clear the screen so it starts empty
+- [ ] **Load your CALL-E key into this window.** Paste this and press Enter. It
+      reads your `.env` file and does not print anything:
+
+```
+Get-Content .env | ForEach-Object { if ($_ -notmatch '^\s*#' -and $_ -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$') { Set-Item -Path "env:$($matches[1])" -Value $matches[2] } }
+```
+
+- [ ] Check it worked:
+
+```
+if ($env:CALLE_API_KEY) { "key loaded" } else { "NOT loaded" }
+```
+
+- [ ] Type `cls` to clear the screen
+
+      **Do all of that BEFORE you start recording.** Your API key must never
+      appear on screen in a public video. Stay in this same window for the whole
+      take — a new window loses the key.
+
 - [ ] Have `A.mp3` to `E.mp3` open and ready to click
 - [ ] Press **Start Recording** in OBS
 - [ ] Run this:
