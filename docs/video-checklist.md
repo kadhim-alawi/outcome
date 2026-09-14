@@ -123,9 +123,13 @@ person, the whole thing looks staged.
 These are what gets played down the phone to the agent.
 
 ### `A.mp3` — the main answer
+
+*Say "shipping boxes", not "insulated shipping boxes". The recogniser hears
+"insulated" as "inflated", and CALL-E then refuses to authorise the commit call
+because the approved terms no longer match what the customer asked for.*
 ```
-Yes, we can do that. Fifty insulated shipping boxes, three hundred and eighty
-dollars. We can deliver on the sixteenth of September.
+Yes, we can do that. Fifty shipping boxes, three hundred and eighty dollars. We
+can deliver on the sixteenth of September.
 ```
 
 ### `B.mp3` — confirming
@@ -242,7 +246,7 @@ Then play clips as it asks for things:
 | It says something like | You play |
 |---|---|
 | "Hi, I'm an AI assistant placing this call on behalf of a customer" | `E.mp3`, or nothing |
-| "Can you supply fifty insulated shipping boxes, delivered by September seventeenth, under five hundred dollars?" | `A.mp3` |
+| "Can you supply fifty shipping boxes, delivered by September seventeenth, under five hundred dollars?" | `A.mp3` |
 | "Just to confirm, that's fifty boxes for three hundred and eighty dollars, delivered September sixteenth" | `B.mp3` |
 | "Do you have a reference number?" | `C.mp3` |
 | "Thank you, I'll let the customer know" | nothing — let it hang up |

@@ -246,7 +246,41 @@ next *from* what the last call said, so it can never want two lines at once.
 Anything doing parallel fan-out would feel this limit immediately; anything
 doing genuine multi-step reasoning will not.
 
-## 5. Smaller things
+## 5. The approval envelope is checked against the goal, and that is a good thing
+
+Worth recording because it caught a real mistake of ours, live.
+
+On a commit call, CALL-E compares the terms the agent is authorised to accept
+against what the goal says the customer needs, and refuses if they disagree:
+
+```
+HTTP 422 call_not_ready
+"The request says the customer needs “50 insulated shipping boxes,” but the
+approved terms say “50 inflated shipping boxes.” Which item should the
+assistant be authorised to accept?"
+```
+
+The offer had been extracted from a live call where the recogniser heard
+"insulated" as "inflated" — two words that are genuinely hard to separate over a
+narrowband line. Our planner had carried the transcribed wording straight into
+the authorisation, and CALL-E declined to let an agent be authorised to accept an
+item the customer had not asked for.
+
+That is the check doing exactly what it should. An approval envelope that only
+validated its own internal consistency would have let this through, and the
+second call would have committed a customer to the wrong goods on the strength
+of a misheard syllable.
+
+Two notes for anyone building on this:
+
+- **Avoid phonetically fragile words in goals that will be read back over a
+  phone.** We renamed the item and the problem disappeared.
+- **The error is well-formed feedback**, not just a refusal: it quotes both
+  strings and asks which one governs. That made the cause obvious in seconds.
+
+---
+
+## 6. Smaller things
 
 - **Reserved recipient response field names** (`summary`, `status`,
   `transcript`, `call_id`, timing fields) are documented in prose in the calls
